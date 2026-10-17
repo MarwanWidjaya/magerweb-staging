@@ -27,6 +27,29 @@
 
 <canvas id="stars" aria-hidden="true"></canvas>
 <canvas id="bh" aria-hidden="true"></canvas>
+<!-- ============ TESSERACT LIVE DEMO ============ -->
+<div class="tess-demo" id="tessDemo" aria-hidden="true">
+  <div class="td-frame">
+    <div class="td-bar mono">
+      <span class="td-live"><i></i>LIVE PREVIEW</span>
+      <span class="td-title">MAGERWEB — INSIDE THE TESSERACT</span>
+      <button class="td-x" id="tdClose" aria-label="Tutup demo">✕</button>
+    </div>
+    <div class="td-screen">
+      <iframe id="tdFrame" title="Live demo MagerWeb" loading="lazy"
+        src="https://marwanwidjaya.github.io/magerweb/?embed=1"></iframe>
+      <div class="td-fallback mono" id="tdFallback" hidden>
+        DEMO TIDAK DAPAT DIMUAT.<br>BUKA VERSI PENUH &rarr;
+      </div>
+    </div>
+    <div class="td-actions">
+      <button class="btn btn-lime" id="tdExplore">EXPLORE PROJECT</button>
+      <a class="btn btn-ghost" href="https://marwanwidjaya.github.io/magerweb/" target="_blank" rel="noopener">OPEN FULL WEBSITE &nearr;</a>
+      <button class="btn btn-ghost" id="tdBack" hidden>&larr; BACK TO TESSERACT</button>
+    </div>
+  </div>
+</div>
+
 <div id="depthMeter" aria-hidden="true">
   <div class="dm-label mono">DEPTH</div>
   <div class="dm-track"><div class="dm-fill" id="dmFill"></div><div class="dm-marker" id="dmMarker"></div></div>
