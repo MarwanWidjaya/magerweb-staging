@@ -127,6 +127,35 @@ var EMBED_MODE = /[?&]embed=1/.test(location.search);
       }
       addTessLayer(3.5, 11, 1.0, .55);
       addTessLayer(7, 9, .45, .30);
+      /* --- RAK BUKU ala Interstellar: deretan vertikal di tiap sel lapis dekat ---
+         yang bikin langsung dikenali sebagai tesseract: bukan garis abstrak,
+         tapi rak-rak buku tak berujung seperti kamar Murph. */
+      (function addBookshelves(){
+        var cell=3.5, grid=11, half=(grid*cell)/2;
+        var v=[], x, y, z, s;
+        // tiap sel: 5 bilah vertikal (punggung buku) di sisi kiri-kanan sel
+        for(x=1;x<grid;x+=2) for(y=0;y<grid;y+=2) for(z=1;z<grid;z+=2){
+          var bx=-half+x*cell, by=-half+y*cell, bz=-half+z*cell;
+          for(s=0;s<5;s++){
+            var off=(s-2)*cell*.16;
+            // bilah kiri
+            v.push(bx-cell/2, by, bz+off,  bx-cell/2, by+cell*.9, bz+off);
+            // bilah kanan
+            v.push(bx+cell/2, by, bz+off,  bx+cell/2, by+cell*.9, bz+off);
+          }
+          // ambalan horizontal tiap sel
+          v.push(bx-cell/2, by+cell*.45, bz-cell*.4,  bx+cell/2, by+cell*.45, bz-cell*.4);
+          v.push(bx-cell/2, by+cell*.9, bz-cell*.4,   bx+cell/2, by+cell*.9, bz-cell*.4);
+        }
+        var g=new THREE.BufferGeometry();
+        g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(v),3));
+        // warna: cokelat kayu hangat, redup di tepi via fog
+        var m=new THREE.LineBasicMaterial({color:0x9a6b3f,transparent:true,opacity:0});
+        var lines=new THREE.LineSegments(g,m);
+        lines.userData={mat:m,cell:cell,speed:1,baseOp:.5};
+        tessGroup.add(lines);
+        tessLayers.push(lines);
+      })();
       (function(){
         var cell=3.5, grid=11, half=(grid*cell)/2, pv=[], x, y, z;
         for(x=0;x<=grid;x+=2) for(y=0;y<=grid;y+=2) for(z=0;z<=grid;z+=2)
@@ -278,7 +307,7 @@ if(dmStage){ var s=stages[0][1],h=stages[0][2];
             L.rotation.x=Math.cos(t*.06)*.02*ud.speed + my*.03*ud.speed;
             var op=tessOp*(ud.baseOp!==undefined?ud.baseOp:.8);
             if(ud.mats){ ud.mats[0].opacity=op; ud.mats[1].opacity=Math.min(1,op*1.5); }
-            else if(ud.mat){ ud.mat.opacity=tessOp*.85; }
+            else if(ud.mat){ ud.mat.opacity=tessOp*(ud.baseOp!==undefined?ud.baseOp:.85); }
           }
         }
 
