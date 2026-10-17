@@ -120,8 +120,12 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
       var tmx=0,tmy=0,mx=0,my=0,journey=0,lastY=window.scrollY,scrollVel=0;
       var dmFill=document.getElementById('dmFill'), dmMarker=document.getElementById('dmMarker'),
           dmStage=document.getElementById('dmStage');
-      var stages=[[0,'EVENT HORIZON'],[.16,'SINGULARITY'],[.36,'TESSERACT'],
-                  [.58,'WORMHOLE'],[.8,'DEEP FIELD'],[.94,'RETURN']];
+      var stages=[[0,'CH.00 · THE VOID','SCROLL TO EXPLORE'],
+                  [.14,'CH.01 · THE PROBLEM','EVERY BUSINESS HITS THIS WALL'],
+                  [.28,'CH.02 · TRANSFORMATION','FROM CHAOS TO SYSTEM'],
+                  [.44,'CH.03 · THE WORKS','DESCENDING INTO THE WORK'],
+                  [.66,'CH.04 · THE SERVICES','CHOOSE YOUR MODULE'],
+                  [.86,'CH.05 · NEXT CHAPTER','FIND YOUR NEXT CHAPTER']];
       window.addEventListener('mousemove',function(e){
         tmx=(e.clientX/window.innerWidth-.5); tmy=(e.clientY/window.innerHeight-.5);
       },{passive:true});
@@ -132,9 +136,11 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
         var pct=Math.round(journey*100);
         if(dmFill) dmFill.style.height=pct+'%';
         if(dmMarker) dmMarker.style.top=pct+'%';
-        if(dmStage){ var s=stages[0][1];
-          for(var k=0;k<stages.length;k++) if(journey>=stages[k][0]) s=stages[k][1];
-          if(dmStage.textContent!==s) dmStage.textContent=s; }
+        if(dmStage){ var s=stages[0][1],h=stages[0][2];
+          for(var k=0;k<stages.length;k++) if(journey>=stages[k][0]){s=stages[k][1];h=stages[k][2];}
+          if(dmStage.textContent!==s) dmStage.textContent=s;
+          var dh=document.getElementById('dmHint');
+          if(dh&&dh.textContent!==h) dh.textContent=h; }
       }
       window.addEventListener('scroll',onScroll,{passive:true}); onScroll();
       window.addEventListener('resize',function(){
