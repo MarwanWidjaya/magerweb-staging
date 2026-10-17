@@ -371,3 +371,25 @@ section[id]{scroll-margin-top:80px}
 
 /* ============ Ray-traced black hole layer ============ */
 #bh{position:fixed;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;opacity:1}
+
+/* ============ CHAPTERS: gold accents + new sections ============ */
+.gold{color:#E9A13B}
+.dm-hint{font-size:.55rem;letter-spacing:.22em;color:var(--faint);writing-mode:vertical-rl;max-height:120px;overflow:hidden}
+@media(max-width:640px){.dm-hint{display:none}}
+
+/* Problem cards */
+.problem-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:1.2rem;margin-top:2.5rem}
+.problem-card{border:1px solid rgba(255,255,255,.09);padding:1.8rem 1.6rem;background:rgba(255,255,255,.015);transition:.3s}
+.problem-card:hover{border-color:rgba(233,161,59,.4);transform:translateY(-3px)}
+.problem-num{font-size:.8rem;letter-spacing:.2em;margin-bottom:1rem}
+.problem-card h3{font-size:1.25rem;margin:0 0 .7rem;letter-spacing:-.01em}
+.problem-card p{color:var(--dim);font-size:.95rem;line-height:1.65;margin:0}
+
+/* Transformation visual: chaos → order */
+.transform-visual{margin:3rem auto 0;max-width:640px;text-align:center}
+.tv-row{display:flex;justify-content:center;gap:1.4rem;flex-wrap:wrap;font-size:.78rem;letter-spacing:.28em}
+.tv-chaos span{color:var(--faint);opacity:.55;transform:rotate(-2deg);display:inline-block}
+.tv-chaos span:nth-child(2){transform:rotate(3deg) translateY(4px)}
+.tv-chaos span:nth-child(3){transform:rotate(-4deg) translateY(-3px)}
+.tv-order span{color:var(--lime);display:inline-block}
+.tv-arrow{font-size:1.6rem;color:#E9A13B;margin:1.2rem 0;animation:cueDrop 2s ease-in-out infinite}
