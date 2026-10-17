@@ -64,6 +64,36 @@ var EMBED_MODE = /[?&]embed=1/.test(location.search);
         opacity:.95,sizeAttenuation:true,depthWrite:false,map:new THREE.CanvasTexture(dotCv)});
       var stars=new THREE.Points(geo,starMat);
       scene.add(stars);
+      var mwPts=null;
+
+      /* ===== MILKY WAY BAND: pita galaxy diagonal ===== */
+      (function(){
+        var MW=900, mpos=new Float32Array(MW*3), mcol=new Float32Array(MW*3);
+        var mwC1=new THREE.Color('#8b7bd8'), mwC2=new THREE.Color('#e8b4d8'),
+            mwC3=new THREE.Color('#7dd3fc'), tc=new THREE.Color();
+        for(var k=0;k<MW;k++){
+          var px=-60+Math.random()*120;
+          var py=px*.42+(Math.random()+Math.random()+Math.random()-1.5)*16;
+          var pz=-20-Math.random()*50;
+          mpos[k*3]=px; mpos[k*3+1]=py; mpos[k*3+2]=pz;
+          var pk=Math.random();
+          tc.copy(pk<.4?mwC1:(pk<.7?mwC2:mwC3));
+          tc.multiplyScalar(.25+Math.random()*.5);
+          mcol[k*3]=tc.r; mcol[k*3+1]=tc.g; mcol[k*3+2]=tc.b;
+        }
+        var mg=new THREE.BufferGeometry();
+        mg.setAttribute('position',new THREE.BufferAttribute(mpos,3));
+        mg.setAttribute('color',new THREE.BufferAttribute(mcol,3));
+        var dotTex2=new THREE.CanvasTexture(dotCv);
+        var mm=new THREE.PointsMaterial({size:.7,vertexColors:true,transparent:true,
+          opacity:.75,map:dotTex2,depthWrite:false,blending:THREE.AdditiveBlending});
+        var mw=new THREE.Points(mg,mm);
+        mw.userData={mat:mm};
+        scene.add(mw);
+        mwPts=mw;
+      })();
+      nebula('rgba(139,123,216,0.35)',-18,10,60,.14);
+      nebula('rgba(232,180,216,0.28)',20,-8,55,.12);
 
       /* black hole kini via ray-traced shader (#bh) */
 
@@ -263,6 +293,7 @@ if(dmStage){ var s=stages[0][1],h=stages[0][2];
         var warp=Math.min(scrollVel*.05,1.1);
 
         stars.rotation.y=t*.016+mx*.35;
+        if(mwPts){ mwPts.rotation.y=t*.008; mwPts.rotation.z=Math.sin(t*.05)*.02; }
         stars.rotation.x=my*.25+Math.sin(t*.1)*.02;
         starMat.size=.85+warp*1.7;
 
