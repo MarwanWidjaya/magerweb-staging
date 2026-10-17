@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dapur Manis — Kue Fresh Setiap Hari</title>
+<meta name="description" content="Dapur Manis: toko kue rumahan dengan kue fresh setiap hari. Pesan custom untuk ulang tahun, wedding & acara.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--cream:#FFF9F2;--cream2:#FDEEDF;--brown:#4A2E1B;--brown2:#6B4226;--caramel:#E8873A;--caramel-d:#C96F24;--txt:#3A2415;--muted:#8A6F5C;--white:#fff}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--cream);color:var(--txt);line-height:1.6;overflow-x:hidden}
+h1,h2,h3,.serif{font-family:'Playfair Display',serif}
+img{max-width:100%;display:block}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+/* demo badge */
+.demo-badge{position:fixed;bottom:16px;right:16px;z-index:99;background:var(--brown);color:#fff;font-size:.7rem;font-weight:700;padding:8px 14px;border-radius:100px;letter-spacing:1px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+/* nav */
+nav{position:fixed;top:0;left:0;right:0;z-index:50;background:rgba(255,249,242,.92);backdrop-filter:blur(12px);border-bottom:1px solid rgba(74,46,27,.1)}
+.nav-in{max-width:1120px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-family:'Playfair Display';font-weight:800;font-size:1.4rem;color:var(--brown)}
+.logo span{color:var(--caramel)}
+.nav-links{display:flex;gap:26px;align-items:center}
+.nav-links a{color:var(--txt);text-decoration:none;font-size:.9rem;font-weight:500}
+.nav-links a:hover{color:var(--caramel-d)}
+.btn{display:inline-block;background:var(--caramel);color:#fff;font-weight:700;text-decoration:none;padding:14px 32px;border-radius:100px;font-size:.95rem;transition:transform .25s,box-shadow .25s,background .25s;border:none;cursor:pointer}
+.btn:hover{background:var(--caramel-d);transform:translateY(-2px);box-shadow:0 12px 28px rgba(232,135,58,.4)}
+.btn-sm{padding:10px 24px;font-size:.85rem}
+/* hero */
+.hero{padding:130px 0 70px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-120px;right:-120px;width:420px;height:420px;background:radial-gradient(circle,rgba(232,135,58,.18),transparent 65%);pointer-events:none}
+.hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}
+.eyebrow{display:inline-block;background:var(--cream2);color:var(--caramel-d);font-weight:700;font-size:.78rem;letter-spacing:2px;padding:8px 18px;border-radius:100px;margin-bottom:22px}
+.hero h1{font-size:clamp(2.4rem,5vw,3.8rem);line-height:1.08;font-weight:800;margin-bottom:20px}
+.hero h1 em{font-style:italic;color:var(--caramel-d)}
+.hero p.sub{color:var(--muted);font-size:1.05rem;margin-bottom:32px;max-width:440px}
+.cta-row{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:36px}
+.btn-outline{background:transparent;color:var(--brown);border:2px solid var(--brown)}
+.btn-outline:hover{background:var(--brown);color:#fff;box-shadow:none}
+.hero-points{display:flex;gap:28px;flex-wrap:wrap}
+.hp{display:flex;align-items:center;gap:10px;font-size:.88rem;font-weight:600}
+.hp i{font-style:normal;font-size:1.2rem}
+.hero-img{position:relative}
+.hero-img img{border-radius:24px;box-shadow:0 30px 70px rgba(74,46,27,.25);aspect-ratio:4/4.4;object-fit:cover;width:100%}
+.float-card{position:absolute;background:#fff;border-radius:16px;padding:14px 20px;box-shadow:0 16px 40px rgba(74,46,27,.2);display:flex;align-items:center;gap:12px;animation:floaty 5s ease-in-out infinite}
+.float-card b{display:block;font-size:.85rem}
+.float-card span{font-size:.75rem;color:var(--muted)}
+.fc1{top:24px;left:-24px}
+.fc2{bottom:32px;right:-16px;animation-delay:2.5s}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+/* marquee */
+.marquee{background:var(--brown);color:var(--cream);overflow:hidden;padding:14px 0}
+.mq-track{display:flex;gap:40px;white-space:nowrap;width:max-content;animation:mq 20s linear infinite;font-weight:600;font-size:.92rem;letter-spacing:1px}
+@keyframes mq{to{transform:translateX(-50%)}}
+/* sections */
+section{padding:90px 0}
+.sec-head{text-align:center;max-width:600px;margin:0 auto 54px}
+.sec-head .kicker{color:var(--caramel-d);font-weight:700;font-size:.8rem;letter-spacing:3px;margin-bottom:12px}
+.sec-head h2{font-size:clamp(1.8rem,3.5vw,2.6rem);font-weight:800;margin-bottom:14px}
+.sec-head p{color:var(--muted)}
+/* keunggulan */
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.feat{background:#fff;border-radius:20px;padding:34px 28px;text-align:center;box-shadow:0 8px 30px rgba(74,46,27,.07);transition:transform .3s}
+.feat:hover{transform:translateY(-8px)}
+.feat .ico{font-size:2.4rem;margin-bottom:16px}
+.feat h3{font-size:1.15rem;margin-bottom:10px}
+.feat p{color:var(--muted);font-size:.92rem}
+/* produk */
+#produk{background:var(--cream2)}
+.prod-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.prod{background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 8px 30px rgba(74,46,27,.08);transition:transform .3s}
+.prod:hover{transform:translateY(-8px)}
+.prod img{height:210px;width:100%;object-fit:cover}
+.prod-body{padding:24px}
+.prod-body h3{font-size:1.2rem;margin-bottom:6px}
+.prod-body p{color:var(--muted);font-size:.88rem;margin-bottom:16px}
+.prod-foot{display:flex;align-items:center;justify-content:space-between}
+.price{font-weight:800;font-size:1.25rem;color:var(--caramel-d)}
+.wa-mini{background:#25D366;color:#fff;text-decoration:none;font-weight:700;font-size:.82rem;padding:10px 20px;border-radius:100px}
+/* testimoni */
+.testi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.testi{background:#fff;border-radius:20px;padding:30px 26px;box-shadow:0 8px 30px rgba(74,46,27,.07)}
+.testi .stars{color:#F5A623;letter-spacing:2px;margin-bottom:14px}
+.testi p{font-size:.93rem;color:var(--txt);margin-bottom:18px;font-style:italic}
+.testi b{display:block;font-size:.9rem}
+.testi span{font-size:.78rem;color:var(--muted)}
+/* cara order */
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+.step{text-align:center;position:relative}
+.step .num{width:56px;height:56px;border-radius:50%;background:var(--caramel);color:#fff;font-weight:800;font-size:1.3rem;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-family:'Playfair Display'}
+.step h3{font-size:1.05rem;margin-bottom:8px}
+.step p{font-size:.87rem;color:var(--muted)}
+/* final cta */
+.final{background:linear-gradient(135deg,var(--brown),var(--brown2));color:var(--cream);text-align:center;border-radius:28px;padding:70px 30px;margin:0 20px;max-width:1080px;margin-left:auto;margin-right:auto}
+.final h2{font-size:clamp(1.9rem,4vw,3rem);margin-bottom:16px}
+.final h2 em{color:var(--caramel)}
+.final p{opacity:.85;margin-bottom:32px;max-width:520px;margin-left:auto;margin-right:auto}
+.btn-wa{background:#25D366;font-size:1.05rem;padding:16px 44px}
+.btn-wa:hover{background:#1fb857;box-shadow:0 12px 30px rgba(37,211,102,.4)}
+/* footer */
+footer{background:var(--brown);color:var(--cream);padding:50px 0 30px;margin-top:90px}
+.foot-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:36px;margin-bottom:36px}
+.foot-grid h4{font-size:.95rem;margin-bottom:14px;letter-spacing:1px}
+.foot-grid p,.foot-grid a{font-size:.88rem;opacity:.8;color:var(--cream);text-decoration:none;display:block;margin-bottom:8px}
+.foot-bottom{border-top:1px solid rgba(255,249,242,.15);padding-top:24px;text-align:center;font-size:.8rem;opacity:.6}
+/* reveal */
+.reveal{opacity:0;transform:translateY(36px);transition:opacity .7s ease,transform .7s ease}
+.reveal.visible{opacity:1;transform:none}
+/* responsive — mobile first priority */
+@media(max-width:900px){
+  .hero-grid{grid-template-columns:1fr;text-align:center}
+  .hero{padding:110px 0 50px}
+  .hero p.sub{margin:0 auto 32px}
+  .cta-row,.hero-points{justify-content:center}
+  .hero-img{max-width:420px;margin:0 auto}
+  .fc1{left:8px}.fc2{right:8px}
+  .feat-grid,.prod-grid,.testi-grid{grid-template-columns:1fr;max-width:420px;margin:0 auto}
+  .steps{grid-template-columns:1fr 1fr;gap:28px}
+  .nav-links a:not(.btn){display:none}
+  section{padding:64px 0}
+  .foot-grid{grid-template-columns:1fr;text-align:center}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.reveal{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div class="demo-badge">DEMO MAGERWEB</div>
+
+<nav><div class="nav-in">
+  <div class="logo">Dapur<span>Manis</span></div>
+  <div class="nav-links">
+    <a href="#keunggulan">Keunggulan</a>
+    <a href="#produk">Produk</a>
+    <a href="#testimoni">Testimoni</a>
+    <a href="https://wa.me/6281234567890?text=Halo%20Dapur%20Manis!" class="btn btn-sm">Pesan Sekarang</a>
+  </div>
+</div></nav>
+
+<header class="hero"><div class="wrap hero-grid">
+  <div>
+    <span class="eyebrow">TOKO KUE RUMAHAN — TASIKMALAYA</span>
+    <h1>Kue fresh <em>setiap hari,</em> dibuat dengan cinta.</h1>
+    <p class="sub">Dari bolu lembut sampai kue ulang tahun custom — semua dipanggang fresh di dapur kami setiap pagi. Tanpa pengawet, tanpa kompromi.</p>
+    <div class="cta-row">
+      <a class="btn" href="https://wa.me/6281234567890?text=Halo%20Dapur%20Manis,%20saya%20mau%20pesan%20kue!">Pesan via WhatsApp</a>
+      <a class="btn btn-outline" href="#produk">Lihat Kue</a>
+    </div>
+    <div class="hero-points">
+      <div class="hp"><i>🔥</i> Fresh dari oven</div>
+      <div class="hp"><i>🎂</i> Custom ulang tahun</div>
+      <div class="hp"><i>🛵</i> Antar se-kota</div>
+    </div>
+  </div>
+  <div class="hero-img">
+    <img src="https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&q=70&auto=format&fit=crop" alt="Kue coklat Dapur Manis" loading="eager">
+    <div class="float-card fc1"><span style="font-size:1.6rem">⭐</span><div><b>4.9/5.0</b><span>320+ ulasan</span></div></div>
+    <div class="float-card fc2"><span style="font-size:1.6rem">📦</span><div><b>1.200+</b><span>kue terjual</span></div></div>
+  </div>
+</div></header>
+
+<div class="marquee"><div class="mq-track" id="mq"></div></div>
+
+<section id="keunggulan"><div class="wrap">
+  <div class="sec-head reveal">
+    <div class="kicker">KENAPA KAMI</div>
+    <h2>Bedanya Dapur Manis</h2>
+    <p>Tiga alasan kenapa pelanggan balik lagi dan lagi.</p>
+  </div>
+  <div class="feat-grid">
+    <div class="feat reveal"><div class="ico">🌅</div><h3>Dipanggang Setiap Pagi</h3><p>Nggak ada stok kemarin. Semua kue keluar dari oven di hari yang sama kamu pesan.</p></div>
+    <div class="feat reveal"><div class="ico">🎨</div><h3>Custom Sesukamu</h3><p>Ulang tahun, wedding, tasyakuran — desain, rasa, dan tulisan bisa request.</p></div>
+    <div class="feat reveal"><div class="ico">💰</div><h3>Harga Rumahan</h3><p>Mulai Rp15rb aja. Rasa premium, harga tetap bersahabat di kantong.</p></div>
+  </div>
+</div></section>
+
+<section id="produk"><div class="wrap">
+  <div class="sec-head reveal">
+    <div class="kicker">ANDALAN KAMI</div>
+    <h2>Kue Best Seller</h2>
+    <p>Paling laris minggu ini. Stok terbatas setiap hari!</p>
+  </div>
+  <div class="prod-grid">
+    <div class="prod reveal">
+      <img src="https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&q=60&auto=format&fit=crop" alt="Brownies Coklat Lumer" loading="lazy">
+      <div class="prod-body"><h3>Brownies Coklat Lumer</h3><p>Coklat premium, tekstur fudgy, topping chocochips.</p>
+      <div class="prod-foot"><span class="price">Rp35rb</span><a class="wa-mini" href="https://wa.me/6281234567890?text=Halo,%20saya%20mau%20pesan%20Brownies%20Coklat%20Lumer!">Pesan</a></div></div>
+    </div>
+    <div class="prod reveal">
+      <img src="https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=600&q=60&auto=format&fit=crop" alt="Strawberry Cake" loading="lazy">
+      <div class="prod-body"><h3>Strawberry Cake</h3><p>Bolu vanilla lembut, krim stroberi asli, segar banget.</p>
+      <div class="prod-foot"><span class="price">Rp45rb</span><a class="wa-mini" href="https://wa.me/6281234567890?text=Halo,%20saya%20mau%20pesan%20Strawberry%20Cake!">Pesan</a></div></div>
+    </div>
+    <div class="prod reveal">
+      <img src="https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=600&q=60&auto=format&fit=crop" alt="Berry Tart" loading="lazy">
+      <div class="prod-body"><h3>Berry Tart Premium</h3><p>Tart renyah, custard vanilla, topping berry segar.</p>
+      <div class="prod-foot"><span class="price">Rp55rb</span><a class="wa-mini" href="https://wa.me/6281234567890?text=Halo,%20saya%20mau%20pesan%20Berry%20Tart%20Premium!">Pesan</a></div></div>
+    </div>
+  </div>
+</div></section>
+
+<section id="testimoni"><div class="wrap">
+  <div class="sec-head reveal">
+    <div class="kicker">KATA MEREKA</div>
+    <h2>Pelanggan Puas</h2>
+  </div>
+  <div class="testi-grid">
+    <div class="testi reveal"><div class="stars">★★★★★</div><p>"Kue ulang tahunnya bagus banget, anak saya seneng! Rasanya juga enak, nggak terlalu manis."</p><b>Ibu Ratna</b><span>Kawalu, Tasikmalaya</span></div>
+    <div class="testi reveal"><div class="stars">★★★★★</div><p>"Pesan 50 box buat acara kantor, datang tepat waktu dan rapi. Recommended!"</p><b>Pak Dedi</b><span>Cihideung, Tasikmalaya</span></div>
+    <div class="testi reveal"><div class="stars">★★★★★</div><p>"Browniesnya juara, lumer di mulut. Udah 3x order nggak pernah kecewa."</p><b>Teh Santi</b><span>Cipedes, Tasikmalaya</span></div>
+  </div>
+</div></section>
+
+<section id="order"><div class="wrap">
+  <div class="sec-head reveal">
+    <div class="kicker">GAMPANG BANGET</div>
+    <h2>Cara Pesan</h2>
+  </div>
+  <div class="steps">
+    <div class="step reveal"><div class="num">1</div><h3>Pilih Kue</h3><p>Lihat katalog di atas atau tanya yang custom.</p></div>
+    <div class="step reveal"><div class="num">2</div><h3>Chat WhatsApp</h3><p>Klik tombol pesan, otomatis ke WA kami.</p></div>
+    <div class="step reveal"><div class="num">3</div><h3>Kami Panggang</h3><p>Fresh dari oven di hari pengiriman.</p></div>
+    <div class="step reveal"><div class="num">4</div><h3>Diantar / Ambil</h3><p>Antar se-kota atau ambil di toko.</p></div>
+  </div>
+</div></section>
+
+<div class="wrap"><div class="final reveal">
+  <h2>Laper? <em>Pesan sekarang,</em><br>besok pagi fresh dari oven.</h2>
+  <p>Slot panggang harian terbatas — amankan kue favoritmu hari ini.</p>
+  <a class="btn btn-wa" href="https://wa.me/6281234567890?text=Halo%20Dapur%20Manis,%20saya%20mau%20pesan%20kue!">💬 Pesan via WhatsApp</a>
+</div></div>
+
+<footer><div class="wrap">
+  <div class="foot-grid">
+    <div><div class="logo" style="color:#fff;margin-bottom:12px">Dapur<span>Manis</span></div><p>Jl. Mawar No. 12, Kawalu<br>Tasikmalaya, Jawa Barat</p><p>Buka: 08.00 – 20.00 WIB</p></div>
+    <div><h4>MENU</h4><a href="#keunggulan">Keunggulan</a><a href="#produk">Produk</a><a href="#testimoni">Testimoni</a></div>
+    <div><h4>HUBUNGI</h4><a href="https://wa.me/6281234567890">WhatsApp</a><a href="#">Instagram</a><a href="#">TikTok</a></div>
+  </div>
+  <div class="foot-bottom">© 2026 Dapur Manis — Demo portfolio oleh MagerWeb</div>
+</div></footer>
+
+<script>
+// marquee
+(function(){var items=['Fresh Setiap Hari','Tanpa Pengawet','Custom Ulang Tahun','Antar Se-Kota','Harga Mulai Rp15rb'];
+var t=document.getElementById('mq'),h='';for(var r=0;r<2;r++)items.forEach(function(i){h+='<span>✦ '+i+'</span><span style="width:40px"></span>'});t.innerHTML=h;})();
+// reveal
+(function(){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('visible');io.unobserve(e.target)}})},{threshold:.12});
+document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});})();
+</script>
+</body>
+</html>
