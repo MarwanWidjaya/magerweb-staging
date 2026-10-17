@@ -22,6 +22,7 @@ var EMBED_MODE = /[?&]embed=1/.test(location.search);
 (function(){
   var canvas=document.getElementById('stars');
   if(!canvas) return;
+  if(EMBED_MODE){ return; } // demo iframe: konten saja, tanpa WebGL
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var isMobile = window.innerWidth<640;
 
@@ -191,7 +192,11 @@ var EMBED_MODE = /[?&]embed=1/.test(location.search);
           var inDemoZone = journey>=.44 && journey<=.60;
           var dismissed = tdDemo.dataset.dismissed==='1';
           if(inDemoZone && !dismissed && !tdDemo.classList.contains('explore')){
-            if(!tdDemo.classList.contains('on')){ tdDemo.classList.add('on'); tdDemo.setAttribute('aria-hidden','false'); }
+            if(!tdDemo.classList.contains('on')){
+              tdDemo.classList.add('on'); tdDemo.setAttribute('aria-hidden','false');
+              var lf=document.getElementById('tdFrame');
+              if(lf && !lf.src){ lf.src='https://marwanwidjaya.github.io/magerweb/?embed=1'; }
+            }
           } else if(!tdDemo.classList.contains('explore')){
             tdDemo.classList.remove('on'); tdDemo.setAttribute('aria-hidden','true');
             if(!inDemoZone) tdDemo.dataset.dismissed='';
@@ -484,6 +489,7 @@ if(dmStage){ var s=stages[0][1],h=stages[0][2];
 'use strict';
 var canvas=document.getElementById('bh');
 if(!canvas) return;
+if(EMBED_MODE){ canvas.style.display='none'; return; } // demo iframe: tanpa ray-tracer
 var reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 var isMobile=window.innerWidth<640;
 var gl=canvas.getContext('webgl',{alpha:false,antialias:false,depth:false,stencil:false});
