@@ -72,37 +72,45 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
         scene.add(ring); rings.push(ring);
       }
 
-      /* ===== TESSERACT — hypercube 4D wireframe ===== */
-      var tessVerts=[];
-      for(var vi=0;vi<16;vi++) tessVerts.push([(vi&1?1:-1),(vi&2?1:-1),(vi&4?1:-1),(vi&8?1:-1)]);
-      var tessEdges=[];
-      for(var ei=0;ei<16;ei++) for(var ej=ei+1;ej<16;ej++){
-        var df=0; for(var ek=0;ek<4;ek++) if(((ei>>ek)&1)!==((ej>>ek)&1)) df++;
-        if(df===1) tessEdges.push(ei,ej);
-      }
-      var tessPos=new Float32Array(tessEdges.length*3);
-      var tessGeo=new THREE.BufferGeometry();
-      tessGeo.setAttribute('position',new THREE.BufferAttribute(tessPos,3));
-      var tessMat=new THREE.LineBasicMaterial({color:0xC6F24E,transparent:true,opacity:0,
-        blending:THREE.AdditiveBlending,depthWrite:false});
-      var tesseract=new THREE.LineSegments(tessGeo,tessMat);
-      tesseract.position.set(0,0,-14);
-      tesseract.visible=false;
-      scene.add(tesseract);
-      function updateTesseract(t){
-        var p=0;
-        for(var q=0;q<tessEdges.length;q++){
-          var v=tessVerts[tessEdges[q]];
-          var x=v[0],y=v[1],z=v[2],w=v[3];
-          var a=t*.45, x1=x*Math.cos(a)-w*Math.sin(a), w1=x*Math.sin(a)+w*Math.cos(a);
-          var b=t*.32, y1=y*Math.cos(b)-w1*Math.sin(b), w2=y*Math.sin(b)+w1*Math.cos(b);
-          var s=2.7/(2.7-w2);
-          tessPos[p++]=x1*s*2.4; tessPos[p++]=y1*s*2.4; tessPos[p++]=z*2.4;
-        }
-        tessGeo.attributes.position.needsUpdate=true;
-      }
+            /* ===== TESSERACT ala Interstellar — kisi ruangan tak berujung ===== */
+      var tessGroup=new THREE.Group();
+      var tessLineMat, tessPtsMat;
+      (function buildLattice(){
+        var CELL=6, GRID=8, half=(GRID*CELL)/2, v=[];
+        var y,x,z;
+        for(y=0;y<=GRID;y++) for(z=0;z<=GRID;z++)
+          v.push(-half,-half+y*CELL,-half+z*CELL, half,-half+y*CELL,-half+z*CELL);
+        for(x=0;x<=GRID;x++) for(z=0;z<=GRID;z++)
+          v.push(-half+x*CELL,-half,-half+z*CELL, -half+x*CELL,half,-half+z*CELL);
+        for(x=0;x<=GRID;x++) for(y=0;y<=GRID;y++)
+          v.push(-half+x*CELL,-half+y*CELL,-half, -half+x*CELL,-half+y*CELL,half);
+        var lg=new THREE.BufferGeometry();
+        lg.setAttribute('position',new THREE.BufferAttribute(new Float32Array(v),3));
+        tessLineMat=new THREE.LineBasicMaterial({color:0xcbb27f,transparent:true,opacity:0});
+        tessGroup.add(new THREE.LineSegments(lg,tessLineMat));
+        // titik cahaya di persimpangan (subset agar ringan)
+        var pv=[];
+        for(x=0;x<=GRID;x++) for(y=0;y<=GRID;y++) for(z=0;z<=GRID;z++)
+          if((x+y+z)%2===0) pv.push(-half+x*CELL,-half+y*CELL,-half+z*CELL);
+        var pg=new THREE.BufferGeometry();
+        pg.setAttribute('position',new THREE.BufferAttribute(new Float32Array(pv),3));
+        var dc2=document.createElement('canvas'); dc2.width=dc2.height=64;
+        var dg2=dc2.getContext('2d'),
+            grd2=dg2.createRadialGradient(32,32,0,32,32,32);
+        grd2.addColorStop(0,'rgba(255,236,190,1)'); grd2.addColorStop(.5,'rgba(255,220,160,.5)');
+        grd2.addColorStop(1,'rgba(255,220,160,0)');
+        dg2.fillStyle=grd2; dg2.fillRect(0,0,64,64);
+        tessPtsMat=new THREE.PointsMaterial({color:0xffe2ae,size:.5,transparent:true,
+          opacity:0,map:new THREE.CanvasTexture(dc2),depthWrite:false,
+          blending:THREE.AdditiveBlending});
+        tessGroup.add(new THREE.Points(pg,tessPtsMat));
+        tessGroup.userData.cell=CELL;
+      })();
+      tessGroup.position.set(0,0,-16);
+      tessGroup.visible=false;
+      scene.add(tessGroup);
 
-      /* ===== NEBULA ===== */
+/* ===== NEBULA ===== */
       function nebula(colorHex,ox,oy,s,op){
         var cv=document.createElement('canvas'); cv.width=cv.height=128;
         var ng=cv.getContext('2d'), grd=ng.createRadialGradient(64,64,0,64,64,64);
@@ -166,13 +174,19 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
           var _bhC=document.getElementById('bh');
           if(_bhC) _bhC.style.opacity=Math.max(0,1-Math.max(0,(journey-.3)/.08)).toFixed(3);
         }
-        // tesseract muncul di stage TESSERACT (36%→58% journey)
-        var tessIn=Math.max(0,Math.min((journey-.34)/.06,1)),
-            tessOut=Math.max(0,Math.min((journey-.58)/.06,1));
+        // TESSERACT: kisi tak berujung — fade in, melayang melewatinya, fade out
+        var tessIn=Math.max(0,Math.min((journey-.33)/.07,1)),
+            tessOut=Math.max(0,Math.min((journey-.6)/.07,1));
         var tessOp=tessIn*(1-tessOut);
-        tesseract.visible=tessOp>0.01;
-        tessMat.opacity=tessOp*.85;
-        if(tesseract.visible){ updateTesseract(t); tesseract.rotation.z=t*.1; }
+        tessGroup.visible=tessOp>0.01;
+        if(tessGroup.visible){
+          tessLineMat.opacity=tessOp*.5;
+          tessPtsMat.opacity=tessOp*.8;
+          // drift maju tanpa henti (loop mulus per sel)
+          var drift=(t*.9)%tessGroup.userData.cell;
+          tessGroup.position.z=-16+drift;
+          tessGroup.rotation.y=Math.sin(t*.08)*.04+mx*.06;
+        }
 
         // WORMHOLE: 35%→85% — cincin berdenyut mendekat
         var wh=Math.max(0,Math.min((journey-.35)/.5,1));
