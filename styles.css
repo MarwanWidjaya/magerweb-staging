@@ -52,13 +52,14 @@ section[id]{scroll-margin-top:80px}
   transition:opacity .8s ease,visibility .8s}
 #intro.gone{opacity:0;visibility:hidden}
 .intro-inner{text-align:center}
-.intro-num{font-size:clamp(4.5rem,16vw,9rem);font-weight:500;letter-spacing:-.03em;line-height:1;
-  background:linear-gradient(180deg,#fff,#3a3a3a);
-  -webkit-background-clip:text;background-clip:text;color:transparent}
-.intro-label{font-size:.68rem;letter-spacing:.4em;color:var(--dim);margin:1rem 0 1.4rem}
+.intro-num{font-size:clamp(6rem,22vw,13rem);font-weight:700;letter-spacing:-.05em;line-height:.9;
+  background:linear-gradient(180deg,#fff 30%,#444);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 0 80px rgba(198,242,78,.12)}
+.intro-epoch{font-size:.72rem;letter-spacing:.42em;color:var(--lime);margin:1.2rem 0 .6rem}
+.intro-label{font-size:.66rem;letter-spacing:.34em;color:var(--dim);margin:0 0 1.6rem}
 .intro-bar{width:min(300px,58vw);height:2px;background:rgba(255,255,255,.08);margin:0 auto;border-radius:2px;overflow:hidden}
 .intro-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--lime),#fff);transition:width .25s}
-.intro-pct{font-size:.7rem;color:var(--faint);margin-top:.7rem;letter-spacing:.2em}
 
 /* ---------- header ---------- */
 .nav{position:fixed;top:0;left:0;right:0;z-index:100;
