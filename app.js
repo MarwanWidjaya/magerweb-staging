@@ -186,34 +186,52 @@ var EMBED_MODE = /[?&]embed=1/.test(location.search);
         if(dmFill) dmFill.style.height=pct+'%';
         if(dmMarker) dmMarker.style.top=pct+'%';
         
-        /* ===== TESSERACT LIVE DEMO PANEL ===== */
-        var tdDemo=document.getElementById('tessDemo');
-        if(tdDemo && !EMBED_MODE){
-          var inDemoZone = journey>=.44 && journey<=.60;
-          var dismissed = tdDemo.dataset.dismissed==='1';
-          if(inDemoZone && !dismissed && !tdDemo.classList.contains('explore')){
+        /* ===== TESSERACT LIVE DEMO PANEL (bulletproof trigger) ===== */
+        (function(){
+          var tdDemo=document.getElementById('tessDemo');
+          if(!tdDemo || EMBED_MODE) return;
+          if(tdDemo.dataset.init==='1') return;
+          tdDemo.dataset.init='1';
+          var inZone=false, dismissed=false;
+          function show(){
+            if(dismissed || tdDemo.classList.contains('explore')) return;
             if(!tdDemo.classList.contains('on')){
               tdDemo.classList.add('on'); tdDemo.setAttribute('aria-hidden','false');
               var lf=document.getElementById('tdFrame');
               if(lf && !lf.src){ lf.src='https://marwanwidjaya.github.io/magerweb/?embed=1'; }
             }
-          } else if(!tdDemo.classList.contains('explore')){
+          }
+          function hide(){
+            if(tdDemo.classList.contains('explore')) return;
             tdDemo.classList.remove('on'); tdDemo.setAttribute('aria-hidden','true');
-            if(!inDemoZone) tdDemo.dataset.dismissed='';
           }
-          // iframe fallback: jika 9 detik tidak load, tampilkan pesan
-          var tdFrame=document.getElementById('tdFrame'), tdFb=document.getElementById('tdFallback');
-          if(tdFrame && !tdFrame.dataset.watch){
-            tdFrame.dataset.watch='1';
-            setTimeout(function(){
-              try{
-                var ok = tdFrame.contentDocument || tdFrame.contentWindow;
-                if(!ok && tdFb){ tdFb.hidden=false; }
-              }catch(e){ /* cross-origin = loaded, abaikan */ }
-            }, 9000);
-            tdFrame.addEventListener('error', function(){ if(tdFb) tdFb.hidden=false; });
+          function evalZone(){
+            // Mekanisme 1: journey range (lebar)
+            var jz = journey>=.35 && journey<=.65;
+            // Mekanisme 2: section #why/#process terlihat (backup)
+            var sz = false;
+            try{
+              var w=document.getElementById('why'), p=document.getElementById('process');
+              [w,p].forEach(function(el){
+                if(!el) return;
+                var r=el.getBoundingClientRect();
+                if(r.top<window.innerHeight*.7 && r.bottom>window.innerHeight*.3) sz=true;
+              });
+            }catch(e){}
+            var nz = jz || sz;
+            if(nz && !inZone){ inZone=true; dismissed=false; show(); }
+            else if(!nz && inZone){ inZone=false; hide(); }
           }
-        }
+          // cek berkala (tidak bergantung pada event scroll)
+          setInterval(evalZone, 400);
+          window.addEventListener('scroll', evalZone, {passive:true});
+          // tombol tutup manual
+          var c=document.getElementById('tdClose');
+          if(c) c.addEventListener('click', function(){
+            dismissed=true; hide();
+            tdDemo.dataset.dismissed='1';
+          });
+        })();
 
 if(dmStage){ var s=stages[0][1],h=stages[0][2];
           for(var k=0;k<stages.length;k++) if(journey>=stages[k][0]){s=stages[k][1];h=stages[k][2];}
