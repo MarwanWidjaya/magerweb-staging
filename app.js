@@ -64,7 +64,10 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
   if(!reduceMotion && 'IntersectionObserver' in window){
     var io=new IntersectionObserver(function(es){
       es.forEach(function(e){
-        if(e.isIntersecting){ scrambleEl(e.target); io.unobserve(e.target); }
+        if(e.isIntersecting){
+          io.unobserve(e.target);
+          if(!e.target.dataset.scrambled) scrambleEl(e.target);
+        }
       });
     },{threshold:.4});
     document.addEventListener('DOMContentLoaded',function(){
@@ -217,54 +220,103 @@ var EMBED_MODE = /[?&]embed=1/.test(location.search);
       /* --- RAK BUKU SOLID ala Interstellar: rak kayu + buku 3D beneran ---
          InstancedMesh (2 draw call) — kebaca sebagai rak buku di layar HP. */
       (function addSolidBookshelves(){
+        // Tekstur kayu prosedural
+        var woodCv=new OffscreenCanvas(128,128);
+        var wg=woodCv.getContext('2d');
+        wg.fillStyle='#7a5230'; wg.fillRect(0,0,128,128);
+        for(var wi=0;wi<40;wi++){
+          wg.strokeStyle='rgba('+(40+Math.random()*30|0)+','+(25+Math.random()*20|0)+',10,'+(.15+Math.random()*.25)+')';
+          wg.lineWidth=.5+Math.random()*1.5;
+          wg.beginPath();
+          var wy=Math.random()*128;
+          wg.moveTo(0,wy);
+          wg.bezierCurveTo(40,wy+(Math.random()-.5)*8, 80,wy+(Math.random()-.5)*8, 128,wy+(Math.random()-.5)*4);
+          wg.stroke();
+        }
+        var woodTex=new THREE.CanvasTexture(woodCv);
+        woodTex.wrapS=woodTex.wrapT=THREE.RepeatWrapping;
+
+        // Material dengan LIGHTING (bukan flat)
+        var shelfMat=new THREE.MeshLambertMaterial({map:woodTex, color:0xb98a5a});
+        var bookMat=new THREE.MeshLambertMaterial({color:0xffffff});
+
+        // Lampu hangat di koridor
+        var warm1=new THREE.PointLight(0xffb45e, 1.2, 40); warm1.position.set(0,2,-14); scene.add(warm1);
+        var warm2=new THREE.PointLight(0xff9a3e, .8, 40); warm2.position.set(0,-2,-22); scene.add(warm2);
+        var amb=new THREE.AmbientLight(0x604030, .7); scene.add(amb);
+
         var cell=4, nx=5, ny=3, nz=7;
-        var shelfGeo=new THREE.BoxGeometry(cell*.92, .1, .55);
-        var bookGeo=new THREE.BoxGeometry(.14, .62, .4);
-        var shelfMat=new THREE.MeshBasicMaterial({color:0x6b4a2e});
-        var bookMat=new THREE.MeshBasicMaterial({color:0xffffff});
+        var shelfGeo=new THREE.BoxGeometry(cell*.92, .12, .6);
+        var sideGeo=new THREE.BoxGeometry(.12, cell*.85, .6);
+        var backGeo=new THREE.BoxGeometry(cell*.92, cell*.85, .06);
+        var bookGeo=new THREE.BoxGeometry(.15, .62, .42);
+
         var units=[];
-        var cx, cy, cz;
-        for(cx=0;cx<nx;cx++) for(cy=0;cy<ny;cy++) for(cz=0;cz<nz;cz++){
+        for(var cx=0;cx<nx;cx++) for(var cy=0;cy<ny;cy++) for(var cz=0;cz<nz;cz++){
           var px=(cx-(nx-1)/2)*cell, py=(cy-(ny-1)/2)*cell, pz=(cz-(nz-1)/2)*cell;
-          if(Math.abs(px)<cell*.7 && Math.abs(py)<cell*.7) continue; // koridor tengah kosong
+          if(Math.abs(px)<cell*.7 && Math.abs(py)<cell*.7) continue;
           units.push([px,py,pz]);
         }
-        var shelvesPerUnit=4, booksPerShelf=7;
-        var shelfMesh=new THREE.InstancedMesh(shelfGeo, shelfMat, units.length*shelvesPerUnit);
-        var bookMesh=new THREE.InstancedMesh(bookGeo, bookMat, units.length*shelvesPerUnit*booksPerShelf);
+        var shelvesPerUnit=4, booksPerShelf=8;
+        var nU=units.length;
+        var shelfMesh=new THREE.InstancedMesh(shelfGeo, shelfMat, nU*shelvesPerUnit);
+        var sideMesh=new THREE.InstancedMesh(sideGeo, shelfMat, nU*2);
+        var backMesh=new THREE.InstancedMesh(backGeo, shelfMat, nU);
+        var bookMesh=new THREE.InstancedMesh(bookGeo, bookMat, nU*shelvesPerUnit*booksPerShelf);
+
         var dummy=new THREE.Object3D(), col=new THREE.Color();
-        var si=0, bi=0;
-        var palette=[0x8a5a33,0xa06a3a,0x7a4a28,0xb57a45,0x5e3a22,0x96703f,0x6e452a,0xc08a50];
+        var si=0, di=0, ki=0, bi=0;
+        // Palet buku lebih kaya (kayak rak beneran)
+        var palette=[0x8a5a33,0xa06a3a,0x7a4a28,0xb57a45,0x5e3a22,0x96703f,0x6e452a,0xc08a50,
+                     0x4a6a8a,0x8a4a5a,0x3a6a4a,0xd4a95a,0x2a3a5a,0x9a3a2a,0xe8d5b0,0x5a4a6a];
         units.forEach(function(u){
+          // panel samping (kiri-kanan)
+          [-1,1].forEach(function(sgn){
+            dummy.position.set(u[0]+sgn*cell*.44, u[1], u[2]);
+            dummy.rotation.set(0,0,0); dummy.scale.set(1,1,1); dummy.updateMatrix();
+            sideMesh.setMatrixAt(di++,dummy.matrix);
+          });
+          // panel belakang
+          dummy.position.set(u[0], u[1], u[2]-.28);
+          dummy.rotation.set(0,0,0); dummy.scale.set(1,1,1); dummy.updateMatrix();
+          backMesh.setMatrixAt(ki++,dummy.matrix);
+
           for(var s=0;s<shelvesPerUnit;s++){
             var sy=u[1]-cell*.35+s*(cell*.7/(shelvesPerUnit-1));
             dummy.position.set(u[0],sy,u[2]);
-            dummy.rotation.set(0,0,0); dummy.updateMatrix();
+            dummy.rotation.set(0,0,0); dummy.scale.set(1,1,1); dummy.updateMatrix();
             shelfMesh.setMatrixAt(si++,dummy.matrix);
             for(var b=0;b<booksPerShelf;b++){
-              var bx=u[0]-cell*.38+b*(cell*.76/(booksPerShelf-1))+(Math.random()-.5)*.05;
-              dummy.position.set(bx, sy+.36, u[2]+(Math.random()-.5)*.06);
-              dummy.scale.set(1,.85+Math.random()*.3,1);
-              dummy.rotation.set(0,(Math.random()-.5)*.08,0);
+              // kadang ada slot kosong (natural)
+              if(Math.random()<.12) continue;
+              var bx=u[0]-cell*.38+b*(cell*.76/(booksPerShelf-1))+(Math.random()-.5)*.04;
+              var bh=.75+Math.random()*.45;
+              dummy.position.set(bx, sy+.06+bh*.31, u[2]+(Math.random()-.5)*.05);
+              dummy.scale.set(1,bh,1);
+              dummy.rotation.set(0,(Math.random()-.5)*.1,Math.random()<.08?.12:0);
               dummy.updateMatrix();
               bookMesh.setMatrixAt(bi,dummy.matrix);
               col.setHex(palette[(Math.random()*palette.length)|0]);
-              col.multiplyScalar(.75+Math.random()*.5);
+              col.multiplyScalar(.7+Math.random()*.55);
               bookMesh.setColorAt(bi,col);
               bi++;
             }
             dummy.scale.set(1,1,1);
           }
         });
-        shelfMesh.count=si; bookMesh.count=bi;
-        shelfMesh.instanceMatrix.needsUpdate=true; bookMesh.instanceMatrix.needsUpdate=true;
+        shelfMesh.count=si; sideMesh.count=di; backMesh.count=ki; bookMesh.count=bi;
+        shelfMesh.instanceMatrix.needsUpdate=true; sideMesh.instanceMatrix.needsUpdate=true;
+        backMesh.instanceMatrix.needsUpdate=true; bookMesh.instanceMatrix.needsUpdate=true;
         if(bookMesh.instanceColor) bookMesh.instanceColor.needsUpdate=true;
-        var sm=new THREE.MeshBasicMaterial({color:0x6b4a2e,transparent:true,opacity:0});
-        var bm=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0});
-        shelfMesh.material=sm; bookMesh.material=bm;
+
+        // Material transparan untuk fade
+        var sm=shelfMat.clone(); sm.transparent=true; sm.opacity=0;
+        var bm=bookMat.clone(); bm.transparent=true; bm.opacity=0;
+        shelfMesh.material=sm; sideMesh.material=sm; backMesh.material=sm; bookMesh.material=bm;
+
         var grp=new THREE.Group();
-        grp.add(shelfMesh); grp.add(bookMesh);
-        grp.userData={mats:[sm,bm],cell:cell*3,speed:1,baseOp:.4};
+        grp.add(shelfMesh); grp.add(sideMesh); grp.add(backMesh); grp.add(bookMesh);
+        grp.userData={mats:[sm,bm],cell:cell*3,speed:1,baseOp:.95};
         tessGroup.add(grp);
         tessLayers.push(grp);
       })();
