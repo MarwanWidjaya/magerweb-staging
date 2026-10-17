@@ -60,79 +60,7 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
       var stars=new THREE.Points(geo,starMat);
       scene.add(stars);
 
-      /* ===== BLACK HOLE (Gargantua-style) ===== */
-      var bh=new THREE.Group();
-      bh.add(new THREE.Mesh(new THREE.SphereGeometry(3.1,isMobile?24:48,isMobile?16:32),
-        new THREE.MeshBasicMaterial({color:0x000000})));
-      var photon=new THREE.Mesh(new THREE.RingGeometry(3.12,3.44,isMobile?64:128),
-        new THREE.MeshBasicMaterial({color:0xffe6b0,transparent:true,opacity:.95,
-          side:THREE.DoubleSide,depthWrite:false}));
-      bh.add(photon);
-      // lensed arcs — cahaya cakram jauh yang tertekuk gravitasi (khas Gargantua)
-      function lensedArc(){
-        var c=document.createElement('canvas'); c.width=256; c.height=32;
-        var g=c.getContext('2d');
-        var grd=g.createLinearGradient(0,0,256,0);
-        grd.addColorStop(0,'rgba(255,196,110,0)');
-        grd.addColorStop(.3,'rgba(255,196,110,.95)');
-        grd.addColorStop(.55,'rgba(255,180,100,.55)');
-        grd.addColorStop(.8,'rgba(255,170,90,.25)');
-        grd.addColorStop(1,'rgba(255,160,80,0)');
-        g.fillStyle=grd; g.fillRect(0,10,256,12);
-        return new THREE.CanvasTexture(c);
-      }
-      var arcTex=lensedArc();
-      function addArc(bottom){
-        var arc=new THREE.Mesh(
-          new THREE.TorusGeometry(3.85,.24,10,isMobile?48:96,Math.PI),
-          new THREE.MeshBasicMaterial({map:arcTex,transparent:true,
-            blending:THREE.AdditiveBlending,depthWrite:false}));
-        if(bottom) arc.rotation.z=Math.PI;
-        arc.position.y=bottom?-0.5:0.5;
-        arc.rotation.x=0.1;
-        bh.add(arc);
-      }
-      addArc(false); addArc(true);
-      // accretion disk: kanvas 512 — gradasi panas + streak + doppler beaming
-      var dc=document.createElement('canvas'); dc.width=dc.height=512;
-      var g2=dc.getContext('2d'), cx=256;
-      for(var rr=150;rr<256;rr+=2){
-        var tt=(rr-150)/106;
-        var baseA=.95*(1-tt*.72);
-        for(var aa=0;aa<360;aa+=4){
-          var rad=aa*Math.PI/180;
-          var doppler=.5+.5*Math.cos(rad);
-          var streak=.72+.28*Math.sin(aa*7+rr*.16)*Math.sin(aa*3-rr*.11);
-          var heat=1-tt;
-          var cr=Math.floor(255*(.3+.7*heat)),
-              cg=Math.floor(190*(.22+.78*heat*streak)),
-              cb=Math.floor(110*heat*heat);
-          g2.fillStyle='rgba('+cr+','+cg+','+cb+','+(baseA*doppler*streak).toFixed(3)+')';
-          g2.fillRect(cx+Math.cos(rad)*rr-1.4, cx+Math.sin(rad)*rr-1.4, 2.8, 2.8);
-        }
-      }
-      var disk=new THREE.Mesh(
-        new THREE.RingGeometry(3.35,8.6,isMobile?64:128,4),
-        new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(dc),transparent:true,
-          side:THREE.DoubleSide,depthWrite:false}));
-      disk.rotation.x=-Math.PI/2+0.1; // nyaris edge-on ala Gargantua
-      bh.add(disk);
-      // gravitational lensing glow (atas & bawah cakram yang tertekuk)
-      function bhGlow(colorHex,s,op,py){
-        var c2=document.createElement('canvas'); c2.width=c2.height=128;
-        var gg=c2.getContext('2d'), grd=gg.createRadialGradient(64,64,0,64,64,64);
-        grd.addColorStop(0,colorHex); grd.addColorStop(1,'rgba(0,0,0,0)');
-        gg.fillStyle=grd; gg.fillRect(0,0,128,128);
-        var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c2),
-          transparent:true,opacity:op,depthWrite:false,blending:THREE.AdditiveBlending}));
-        sp.scale.set(s,s*.42,1); sp.position.y=py; bh.add(sp);
-      }
-      bhGlow('rgba(233,161,59,0.85)',17,.5,3.5);
-      bhGlow('rgba(233,161,59,0.85)',17,.42,-3.5);
-      bhGlow('rgba(255,230,176,0.6)',9,.5,0);
-      bh.position.set(0,2.4,-10);
-      bh.rotation.z=0.12;
-      scene.add(bh);
+      /* black hole kini via ray-traced shader (#bh) */
 
       /* ===== WORMHOLE — cincin cahaya berdenyut ===== */
       var rings=[];
@@ -226,13 +154,12 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
         stars.rotation.x=my*.25+Math.sin(t*.1)*.02;
         starMat.size=.85+warp*1.7;
 
-        // DIVE: 0→30% scroll kita jatuh melewati black hole
+        // DIVE: 0→30% — black hole shader (uDive) + fade; kamera 3D utk stars/wormhole
         var dive=Math.min(journey/.3,1), ease=dive*dive*(3-2*dive);
-        bh.position.z=-10-ease*52;
-        bh.position.y=2.4-ease*10;
-        var bhs=1+ease*.5; bh.scale.set(bhs,bhs,bhs);
-        disk.rotation.z=t*.13;
-        photon.material.opacity=.92+Math.sin(t*2.2)*.07;
+        if(window.__bh){ __bh.uDive=dive;
+          var _bhC=document.getElementById('bh');
+          if(_bhC) _bhC.style.opacity=Math.max(0,1-Math.max(0,(journey-.3)/.08)).toFixed(3);
+        }
         // tesseract muncul di stage TESSERACT (36%→58% journey)
         var tessIn=Math.max(0,Math.min((journey-.34)/.06,1)),
             tessOut=Math.max(0,Math.min((journey-.58)/.06,1));
@@ -254,7 +181,7 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
         camera.position.z=26-ease*15-wh*7;
         camera.position.x=mx*3;
         camera.position.y=-ease*2.2+my*2;
-        camera.lookAt(mx*4,2.4-ease*10+my*2,-10-ease*22);
+        camera.lookAt(mx*4,my*2,-20);
         var nf=62+warp*13;
         if(Math.abs(camera.fov-nf)>.1){ camera.fov=nf; camera.updateProjectionMatrix(); }
 
@@ -455,4 +382,128 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
   paint();
 })();
 
+})();
+
+/* ============================================================
+   RAY-TRACED BLACK HOLE — fisika lensing gravitasi asli.
+   Tiap piksel menelusuri berkas cahaya yang dibengkokkan
+   gravitasi (pers. Binet), bukan gambar tempelan.
+   ============================================================ */
+(function(){
+'use strict';
+var canvas=document.getElementById('bh');
+if(!canvas) return;
+var reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var isMobile=window.innerWidth<640;
+var gl=canvas.getContext('webgl',{alpha:false,antialias:false,depth:false,stencil:false});
+if(!gl){ canvas.style.display='none'; return; }
+
+var VS='attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
+var FS=[
+'precision highp float;',
+'uniform vec2 uRes;uniform float uTime;uniform float uDive;uniform vec2 uMouse;uniform float uSteps;',
+'float hash12(vec2 p){vec3 p3=fract(vec3(p.xyx)*.1031);p3+=dot(p3,p3.yzx+33.33);return fract((p3.x+p3.y)*p3.z);}',
+'float vnoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);',
+' float a=hash12(i),b=hash12(i+vec2(1.,0.)),c=hash12(i+vec2(0.,1.)),d=hash12(i+vec2(1.,1.));',
+' return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);}',
+'void main(){',
+' vec2 uv=(gl_FragCoord.xy*2.-uRes)/min(uRes.x,uRes.y);',
+ // kamera: jauh → dive ke horizon; mouse parallax halus
+' float camZ=mix(9.5,2.9,uDive);',
+' vec3 ro=vec3(uMouse.x*.9,.55+uMouse.y*.5,camZ);',
+' vec3 rd=normalize(vec3(uv.x,uv.y,-2.1));',
+' vec3 p=ro,v=rd,col=vec3(0.);',
+' float hit=0.;', // 0 miss, 1 disk, 2 captured
+' float diskIn=1.55,diskOut=4.7,dt=.13;',
+' for(float i=0.;i<110.;i++){',
+'  if(i>=uSteps)break;',
+'  float r2=dot(p,p),r=sqrt(r2);',
+'  if(r<1.){hit=2.;break;}',
+'  vec3 acc=-1.5*p/(r2*r2*r+1e-5);', // pembengkokan gravitasi
+'  v=normalize(v+acc*dt);',
+'  vec3 np=p+v*dt;',
+'  if(p.y*np.y<=0.&&abs(p.y-np.y)>1e-6){', // lintas bidang cakram
+'   float t=p.y/(p.y-np.y);vec3 x=mix(p,np,t);float cr=length(x.xz);',
+'   if(cr>diskIn&&cr<diskOut){',
+'    float ang=atan(x.z,x.x);',
+'    float omega=1.7*pow(cr,-1.5);', // Kepler: dalam lebih cepat
+'    float a2=ang-uTime*omega;',
+'    float streak=vnoise(vec2(a2*3.,cr*4.))*.6+vnoise(vec2(a2*7.+13.,cr*9.))*.4;',
+'    streak=.5+.85*streak;',
+'    float temp=clamp(pow(2.7/max(cr-.9,.15),.85),0.,2.3);',
+'    vec3 tang=vec3(x.z,0.,-x.x)/max(cr,1e-4);', // arah orbit (kiri terang)
+'    vec3 toCam=normalize(ro-x);',
+'    float dop=dot(tang,toCam);',
+'    float beam=clamp(1.+dop*1.15,.32,2.5);', // doppler beaming
+'    vec3 dcol=mix(vec3(.72,.26,.09),vec3(1.,.6,.26),clamp(temp*.7,0.,1.));',
+'    dcol=mix(dcol,vec3(1.,.93,.8),clamp(temp-1.,0.,1.));',
+'    float edge=smoothstep(diskIn,diskIn+.55,cr)*(1.-smoothstep(diskOut-1.3,diskOut,cr));',
+'    col+=dcol*(temp*beam*streak)*1.2*edge;',
+'    hit=1.;break;',
+'   }',
+'  }',
+'  p=np;',
+'  if(r>26.)break;',
+' }',
+' if(hit<.5){', // latar bintang dari arah akhir berkas (ter-lensing)
+'  vec2 sp=v.xy/(abs(v.z)+.45);',
+'  vec2 g=sp*34.;vec2 id=floor(g);vec2 f2=fract(g)-.5;',
+'  float h=hash12(id);',
+'  float star=step(.993,h)*smoothstep(.3,.04,length(f2));',
+'  float tw=.7+.3*sin(uTime*2.5+h*44.);',
+'  col+=vec3(.82,.88,1.)*star*tw*.9;',
+'  float band=exp(-pow((sp.y+sp.x*.22)*1.5,2.))*0.045;',
+'  col+=vec3(.35,.45,.75)*band;',
+'  col+=vec3(.012,.016,.03);',
+' }',
+' float vig=1.-.32*dot(uv,uv);',
+' gl_FragColor=vec4(col*vig,1.);',
+'}'
+].join('\n');
+
+function sh(type,src){var s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);
+ if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){canvas.style.display='none';return null;}return s;}
+var vs=sh(gl.VERTEX_SHADER,VS),fs=sh(gl.FRAGMENT_SHADER,FS);
+if(!vs||!fs) return;
+var pr=gl.createProgram();gl.attachShader(pr,vs);gl.attachShader(pr,fs);gl.linkProgram(pr);
+if(!gl.getProgramParameter(pr,gl.LINK_STATUS)){canvas.style.display='none';return;}
+gl.useProgram(pr);
+var buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+var loc=gl.getAttribLocation(pr,'p');
+gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+function U(n){return gl.getUniformLocation(pr,n);}
+var uRes=U('uRes'),uTime=U('uTime'),uDive=U('uDive'),uMouse=U('uMouse'),uSteps=U('uSteps');
+
+var scale=isMobile?.55:.7, mx=0,my=0,tmx=0,tmy=0;
+function size(){
+  var w=Math.floor(window.innerWidth*scale),h=Math.floor(window.innerHeight*scale);
+  if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}
+  gl.viewport(0,0,w,h);
+}
+size();window.addEventListener('resize',size);
+window.addEventListener('mousemove',function(e){
+  tmx=(e.clientX/window.innerWidth-.5);tmy=(e.clientY/window.innerHeight-.5);
+},{passive:true});
+
+var bhState={uDive:0};
+window.__bh=bhState;
+var t0=performance.now(),lastT=0;
+(function frame(){
+  var now=performance.now(),t=(now-t0)*.001;
+  // hemat baterai: skip frame bila tab hidden atau bh sudah fade out
+  var op=parseFloat(canvas.style.opacity||'1');
+  if(document.hidden||op<=0.01){requestAnimationFrame(frame);return;}
+  if(t-lastT<1/45&&!reduceMotion){requestAnimationFrame(frame);return;}
+  lastT=t;
+  mx+=(tmx-mx)*.05;my+=(tmy-my)*.05;
+  size();
+  gl.uniform2f(uRes,canvas.width,canvas.height);
+  gl.uniform1f(uTime,reduceMotion?0:t);
+  gl.uniform1f(uDive,bhState.uDive);
+  gl.uniform2f(uMouse,mx,my);
+  gl.uniform1f(uSteps,isMobile?52:84);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+  requestAnimationFrame(frame);
+})();
 })();
