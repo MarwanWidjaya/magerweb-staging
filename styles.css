@@ -336,3 +336,18 @@ section[id]{scroll-margin-top:80px}
   #intro{display:none}
   .ticker-track{animation:none}
 }
+
+/* ============ COSMIC JOURNEY: depth meter + narrative ============ */
+#depthMeter{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:60;
+  display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+.dm-label{font-size:.58rem;letter-spacing:.3em;color:var(--faint);writing-mode:vertical-rl}
+.dm-track{position:relative;width:2px;height:22vh;min-height:120px;background:rgba(255,255,255,.1);border-radius:2px}
+.dm-fill{position:absolute;top:0;left:0;width:100%;height:0;background:linear-gradient(180deg,var(--lime),#E9A13B);border-radius:2px;transition:height .15s}
+.dm-marker{position:absolute;top:0;left:50%;width:8px;height:8px;border-radius:50%;
+  background:#fff;box-shadow:0 0 10px var(--lime);transform:translate(-50%,-50%);transition:top .15s}
+.dm-stage{font-size:.58rem;letter-spacing:.24em;color:var(--lime);writing-mode:vertical-rl;max-height:140px;overflow:hidden}
+@media(max-width:640px){#depthMeter{right:8px}.dm-stage{display:none}}
+.journey-tag{color:var(--lime);font-size:.85em;letter-spacing:.18em}
+.hero-scroll{display:flex;flex-direction:column;align-items:center;gap:6px}
+.hero-scroll i{font-style:normal;animation:cueDrop 1.8s ease-in-out infinite;color:var(--lime);font-size:1.1rem}
+@keyframes cueDrop{0%,100%{transform:translateY(0);opacity:.9}50%{transform:translateY(10px);opacity:.4}}
