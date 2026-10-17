@@ -49,8 +49,13 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
       var geo=new THREE.BufferGeometry();
       geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
       geo.setAttribute('color',new THREE.BufferAttribute(col,3));
-      var mat=new THREE.PointsMaterial({size:.55,vertexColors:true,transparent:true,
-        opacity:.95,sizeAttenuation:true,depthWrite:false});
+      var dotCv=document.createElement('canvas'); dotCv.width=dotCv.height=64;
+      var dg=dotCv.getContext('2d'), dgrd=dg.createRadialGradient(32,32,0,32,32,32);
+      dgrd.addColorStop(0,'rgba(255,255,255,1)'); dgrd.addColorStop(.4,'rgba(255,255,255,.9)');
+      dgrd.addColorStop(1,'rgba(255,255,255,0)');
+      dg.fillStyle=dgrd; dg.fillRect(0,0,64,64);
+      var mat=new THREE.PointsMaterial({size:.85,vertexColors:true,transparent:true,
+        opacity:.95,sizeAttenuation:true,depthWrite:false,map:new THREE.CanvasTexture(dotCv)});
       var stars=new THREE.Points(geo,mat);
       scene.add(stars);
 
