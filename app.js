@@ -68,6 +68,31 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
         new THREE.MeshBasicMaterial({color:0xffe6b0,transparent:true,opacity:.95,
           side:THREE.DoubleSide,depthWrite:false}));
       bh.add(photon);
+      // lensed arcs — cahaya cakram jauh yang tertekuk gravitasi (khas Gargantua)
+      function lensedArc(){
+        var c=document.createElement('canvas'); c.width=256; c.height=32;
+        var g=c.getContext('2d');
+        var grd=g.createLinearGradient(0,0,256,0);
+        grd.addColorStop(0,'rgba(255,196,110,0)');
+        grd.addColorStop(.3,'rgba(255,196,110,.95)');
+        grd.addColorStop(.55,'rgba(255,180,100,.55)');
+        grd.addColorStop(.8,'rgba(255,170,90,.25)');
+        grd.addColorStop(1,'rgba(255,160,80,0)');
+        g.fillStyle=grd; g.fillRect(0,10,256,12);
+        return new THREE.CanvasTexture(c);
+      }
+      var arcTex=lensedArc();
+      function addArc(bottom){
+        var arc=new THREE.Mesh(
+          new THREE.TorusGeometry(3.85,.24,10,isMobile?48:96,Math.PI),
+          new THREE.MeshBasicMaterial({map:arcTex,transparent:true,
+            blending:THREE.AdditiveBlending,depthWrite:false}));
+        if(bottom) arc.rotation.z=Math.PI;
+        arc.position.y=bottom?-0.5:0.5;
+        arc.rotation.x=0.1;
+        bh.add(arc);
+      }
+      addArc(false); addArc(true);
       // accretion disk: kanvas 512 — gradasi panas + streak + doppler beaming
       var dc=document.createElement('canvas'); dc.width=dc.height=512;
       var g2=dc.getContext('2d'), cx=256;
@@ -90,7 +115,7 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
         new THREE.RingGeometry(3.35,8.6,isMobile?64:128,4),
         new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(dc),transparent:true,
           side:THREE.DoubleSide,depthWrite:false}));
-      disk.rotation.x=-Math.PI/2+0.42;
+      disk.rotation.x=-Math.PI/2+0.1; // nyaris edge-on ala Gargantua
       bh.add(disk);
       // gravitational lensing glow (atas & bawah cakram yang tertekuk)
       function bhGlow(colorHex,s,op,py){
@@ -117,6 +142,36 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
             depthWrite:false,blending:THREE.AdditiveBlending}));
         ring.position.z=-40-w*9;
         scene.add(ring); rings.push(ring);
+      }
+
+      /* ===== TESSERACT — hypercube 4D wireframe ===== */
+      var tessVerts=[];
+      for(var vi=0;vi<16;vi++) tessVerts.push([(vi&1?1:-1),(vi&2?1:-1),(vi&4?1:-1),(vi&8?1:-1)]);
+      var tessEdges=[];
+      for(var ei=0;ei<16;ei++) for(var ej=ei+1;ej<16;ej++){
+        var df=0; for(var ek=0;ek<4;ek++) if(((ei>>ek)&1)!==((ej>>ek)&1)) df++;
+        if(df===1) tessEdges.push(ei,ej);
+      }
+      var tessPos=new Float32Array(tessEdges.length*3);
+      var tessGeo=new THREE.BufferGeometry();
+      tessGeo.setAttribute('position',new THREE.BufferAttribute(tessPos,3));
+      var tessMat=new THREE.LineBasicMaterial({color:0xC6F24E,transparent:true,opacity:0,
+        blending:THREE.AdditiveBlending,depthWrite:false});
+      var tesseract=new THREE.LineSegments(tessGeo,tessMat);
+      tesseract.position.set(0,0,-14);
+      tesseract.visible=false;
+      scene.add(tesseract);
+      function updateTesseract(t){
+        var p=0;
+        for(var q=0;q<tessEdges.length;q++){
+          var v=tessVerts[tessEdges[q]];
+          var x=v[0],y=v[1],z=v[2],w=v[3];
+          var a=t*.45, x1=x*Math.cos(a)-w*Math.sin(a), w1=x*Math.sin(a)+w*Math.cos(a);
+          var b=t*.32, y1=y*Math.cos(b)-w1*Math.sin(b), w2=y*Math.sin(b)+w1*Math.cos(b);
+          var s=2.7/(2.7-w2);
+          tessPos[p++]=x1*s*2.4; tessPos[p++]=y1*s*2.4; tessPos[p++]=z*2.4;
+        }
+        tessGeo.attributes.position.needsUpdate=true;
       }
 
       /* ===== NEBULA ===== */
@@ -178,6 +233,13 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
         var bhs=1+ease*.5; bh.scale.set(bhs,bhs,bhs);
         disk.rotation.z=t*.13;
         photon.material.opacity=.92+Math.sin(t*2.2)*.07;
+        // tesseract muncul di stage TESSERACT (36%→58% journey)
+        var tessIn=Math.max(0,Math.min((journey-.34)/.06,1)),
+            tessOut=Math.max(0,Math.min((journey-.58)/.06,1));
+        var tessOp=tessIn*(1-tessOut);
+        tesseract.visible=tessOp>0.01;
+        tessMat.opacity=tessOp*.85;
+        if(tesseract.visible){ updateTesseract(t); tesseract.rotation.z=t*.1; }
 
         // WORMHOLE: 35%→85% — cincin berdenyut mendekat
         var wh=Math.max(0,Math.min((journey-.35)/.5,1));
@@ -337,6 +399,60 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
 (function(){
   var b=document.getElementById('toTop');
   if(b) b.addEventListener('click',function(){ window.scrollTo({top:0,behavior:'smooth'}); });
+})();
+
+
+/* ---------- Room slider (horizontal) ---------- */
+(function(){
+  var track=document.querySelector('.slider-track');
+  if(!track) return;
+  var rooms=track.querySelectorAll('.room');
+  var dotsBox=document.querySelector('.slider-dots');
+  var prev=document.querySelector('.slider-prev'), next=document.querySelector('.slider-next');
+  var dots=[];
+  rooms.forEach(function(_,i){
+    var d=document.createElement('button');
+    d.setAttribute('aria-label','Ke karya '+(i+1));
+    d.addEventListener('click',function(){ goTo(i); });
+    dotsBox.appendChild(d); dots.push(d);
+  });
+  function cur(){
+    var w=rooms[0].offsetWidth+24;
+    return Math.max(0,Math.min(rooms.length-1,Math.round(track.scrollLeft/w)));
+  }
+  function goTo(i){
+    i=Math.max(0,Math.min(rooms.length-1,i));
+    track.scrollTo({left:i*(rooms[0].offsetWidth+24),behavior:'smooth'});
+  }
+  function paint(){
+    var c=cur();
+    dots.forEach(function(d,i){ d.classList.toggle('on',i===c); });
+    if(prev) prev.style.opacity=c===0?.35:1;
+    if(next) next.style.opacity=c===rooms.length-1?.35:1;
+  }
+  if(prev) prev.addEventListener('click',function(){ goTo(cur()-1); });
+  if(next) next.addEventListener('click',function(){ goTo(cur()+1); });
+  var st; track.addEventListener('scroll',function(){
+    clearTimeout(st); st=setTimeout(paint,80);
+  },{passive:true});
+  /* drag to scroll */
+  var down=false,sx=0,sl=0;
+  track.addEventListener('pointerdown',function(e){
+    down=true; sx=e.clientX; sl=track.scrollLeft; track.classList.add('dragging');
+  });
+  window.addEventListener('pointermove',function(e){
+    if(!down) return; track.scrollLeft=sl-(e.clientX-sx);
+  });
+  window.addEventListener('pointerup',function(){
+    down=false; track.classList.remove('dragging'); paint();
+  });
+  /* keyboard */
+  track.setAttribute('tabindex','0');
+  track.addEventListener('keydown',function(e){
+    if(e.key==='ArrowRight') goTo(cur()+1);
+    if(e.key==='ArrowLeft') goTo(cur()-1);
+  });
+  paint();
 })();
 
 })();
