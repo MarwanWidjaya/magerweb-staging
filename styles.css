@@ -393,3 +393,30 @@ section[id]{scroll-margin-top:80px}
 .tv-chaos span:nth-child(3){transform:rotate(-4deg) translateY(-3px)}
 .tv-order span{color:var(--lime);display:inline-block}
 .tv-arrow{font-size:1.6rem;color:#E9A13B;margin:1.2rem 0;animation:cueDrop 2s ease-in-out infinite}
+
+/* ============ TESSERACT LIVE DEMO PANEL ============ */
+.tess-demo{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;
+  padding:1rem;pointer-events:none;opacity:0;transform:scale(.94);transition:opacity .5s,transform .5s}
+.tess-demo.on{opacity:1;transform:scale(1);pointer-events:auto}
+.tess-demo.off{opacity:0;transform:scale(.94);pointer-events:none!important}
+.td-frame{width:min(560px,92vw);background:#0c0a07;border:1px solid rgba(233,161,59,.45);
+  box-shadow:0 0 80px rgba(233,161,59,.18),0 30px 80px rgba(0,0,0,.7);overflow:hidden}
+.tess-demo.explore .td-frame{width:min(1100px,96vw);height:min(82vh,860px);display:flex;flex-direction:column}
+.td-bar{display:flex;align-items:center;gap:.8rem;padding:.7rem 1rem;border-bottom:1px solid rgba(233,161,59,.25);
+  background:rgba(233,161,59,.06)}
+.td-live{display:flex;align-items:center;gap:.45rem;font-size:.68rem;letter-spacing:.2em;color:#E9A13B}
+.td-live i{width:8px;height:8px;border-radius:50%;background:#ff5b5b;animation:blink 1.4s infinite}
+@keyframes blink{50%{opacity:.25}}
+.td-title{flex:1;font-size:.62rem;letter-spacing:.18em;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.td-x{background:none;border:1px solid rgba(255,255,255,.2);color:#fff;width:30px;height:30px;border-radius:50%;
+  cursor:pointer;font-size:.8rem;line-height:1}
+.td-x:hover{border-color:#E9A13B;color:#E9A13B}
+.td-screen{position:relative;aspect-ratio:16/10;background:#000}
+.tess-demo.explore .td-screen{flex:1;aspect-ratio:auto}
+.td-screen iframe{width:100%;height:100%;border:0;pointer-events:none;background:#050505}
+.tess-demo.explore .td-screen iframe{pointer-events:auto}
+.td-fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;
+  font-size:.75rem;letter-spacing:.15em;line-height:2;color:#E9A13B;background:#0c0a07}
+.td-actions{display:flex;gap:.7rem;padding:.9rem 1rem;border-top:1px solid rgba(233,161,59,.25);
+  flex-wrap:wrap;background:rgba(0,0,0,.4)}
+@media(max-width:640px){.td-actions .btn{font-size:.72rem;padding:.7rem .9rem}}
