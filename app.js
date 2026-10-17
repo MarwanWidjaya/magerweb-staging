@@ -14,6 +14,10 @@ function initIcons(){
 initIcons();
 if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons); }
 
+/* ---------- EMBED MODE (?embed=1): demo di dalam iframe ----------
+   Mencegah iframe bersarang + meringankan efek di dalam demo. */
+var EMBED_MODE = /[?&]embed=1/.test(location.search);
+
 /* ---------- 3D COSMIC JOURNEY: black hole → wormhole → tesseract ---------- */
 (function(){
   var canvas=document.getElementById('stars');
@@ -32,7 +36,7 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
       camera.position.set(0,0,26);
 
       /* ===== STARFIELD ===== */
-      var COUNT=isMobile?900:2200;
+      var COUNT=EMBED_MODE?500:(isMobile?900:2200);
       var pos=new Float32Array(COUNT*3), col=new Float32Array(COUNT*3);
       var lime=new THREE.Color('#C6F24E'), white=new THREE.Color('#ffffff'),
           cyan=new THREE.Color('#7dd3fc'), gold=new THREE.Color('#E9A13B'), tmp=new THREE.Color();
@@ -72,41 +76,77 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
         scene.add(ring); rings.push(ring);
       }
 
-            /* ===== TESSERACT ala Interstellar — kisi ruangan tak berujung ===== */
+                  /* ===== TESSERACT v3 — ruang berlapis ala Interstellar =====
+         Lapisan dekat (rapat, terang) + lapisan jauh (jarang, redup) = parallax nyata.
+         Warna vertex: amber hangat di koridor tengah → cokelat gelap di tepi. */
       var tessGroup=new THREE.Group();
-      var tessLineMat, tessPtsMat;
-      (function buildLattice(){
-        var CELL=6, GRID=8, half=(GRID*CELL)/2, v=[];
-        var y,x,z;
-        for(y=0;y<=GRID;y++) for(z=0;z<=GRID;z++)
-          v.push(-half,-half+y*CELL,-half+z*CELL, half,-half+y*CELL,-half+z*CELL);
-        for(x=0;x<=GRID;x++) for(z=0;z<=GRID;z++)
-          v.push(-half+x*CELL,-half,-half+z*CELL, -half+x*CELL,half,-half+z*CELL);
-        for(x=0;x<=GRID;x++) for(y=0;y<=GRID;y++)
-          v.push(-half+x*CELL,-half+y*CELL,-half, -half+x*CELL,-half+y*CELL,half);
-        var lg=new THREE.BufferGeometry();
-        lg.setAttribute('position',new THREE.BufferAttribute(new Float32Array(v),3));
-        tessLineMat=new THREE.LineBasicMaterial({color:0xcbb27f,transparent:true,opacity:0});
-        tessGroup.add(new THREE.LineSegments(lg,tessLineMat));
-        // titik cahaya di persimpangan (subset agar ringan)
-        var pv=[];
-        for(x=0;x<=GRID;x++) for(y=0;y<=GRID;y++) for(z=0;z<=GRID;z++)
-          if((x+y+z)%2===0) pv.push(-half+x*CELL,-half+y*CELL,-half+z*CELL);
+      var tessLayers=[];
+      function latticeGeom(cell, grid, accentEvery){
+        var half=(grid*cell)/2, v=[], a=[];
+        function push(arr,px1,py1,pz1,px2,py2,pz2){arr.push(px1,py1,pz1,px2,py2,pz2);}
+        var x,y,z;
+        for(y=0;y<=grid;y++) for(z=0;z<=grid;z++)
+          push((y%accentEvery===0&&z%accentEvery===0)?a:v,
+            -half,-half+y*cell,-half+z*cell, half,-half+y*cell,-half+z*cell);
+        for(x=0;x<=grid;x++) for(z=0;z<=grid;z++)
+          push((x%accentEvery===0&&z%accentEvery===0)?a:v,
+            -half+x*cell,-half,-half+z*cell, -half+x*cell,half,-half+z*cell);
+        for(x=0;x<=grid;x++) for(y=0;y<=grid;y++)
+          push((x%accentEvery===0&&y%accentEvery===0)?a:v,
+            -half+x*cell,-half+y*cell,-half, -half+x*cell,-half+y*cell,half);
+        function paint(arr, bright){
+          var col=new Float32Array(arr.length);
+          var warm=[.98,.74,.42], dark=[.14,.09,.05];
+          for(var i=0;i<arr.length;i+=3){
+            var d=Math.sqrt(arr[i]*arr[i]+arr[i+1]*arr[i+1])/(half*1.15);
+            d=Math.min(1,d);
+            var f=Math.pow(1-d,1.7)*bright;
+            col[i]=dark[0]+(warm[0]-dark[0])*f;
+            col[i+1]=dark[1]+(warm[1]-dark[1])*f;
+            col[i+2]=dark[2]+(warm[2]-dark[2])*f;
+          }
+          var g=new THREE.BufferGeometry();
+          g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(arr),3));
+          g.setAttribute('color',new THREE.BufferAttribute(col,3));
+          return g;
+        }
+        return {base:paint(v,1), accent:paint(a,1.35)};
+      }
+      function addTessLayer(cell, grid, speed, baseOp){
+        var G=latticeGeom(cell,grid,3);
+        var grp=new THREE.Group();
+        var m1=new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0});
+        var m2=new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0});
+        grp.add(new THREE.LineSegments(G.base,m1));
+        grp.add(new THREE.LineSegments(G.accent,m2));
+        grp.userData={cell:cell,speed:speed,mats:[m1,m2],baseOp:baseOp};
+        tessGroup.add(grp);
+        tessLayers.push(grp);
+        return grp;
+      }
+      addTessLayer(3.5, 11, 1.0, .55);
+      addTessLayer(7, 9, .45, .30);
+      (function(){
+        var cell=3.5, grid=11, half=(grid*cell)/2, pv=[], x, y, z;
+        for(x=0;x<=grid;x+=2) for(y=0;y<=grid;y+=2) for(z=0;z<=grid;z+=2)
+          pv.push(-half+x*cell,-half+y*cell,-half+z*cell);
         var pg=new THREE.BufferGeometry();
         pg.setAttribute('position',new THREE.BufferAttribute(new Float32Array(pv),3));
         var dc2=document.createElement('canvas'); dc2.width=dc2.height=64;
         var dg2=dc2.getContext('2d'),
             grd2=dg2.createRadialGradient(32,32,0,32,32,32);
-        grd2.addColorStop(0,'rgba(255,236,190,1)'); grd2.addColorStop(.5,'rgba(255,220,160,.5)');
-        grd2.addColorStop(1,'rgba(255,220,160,0)');
+        grd2.addColorStop(0,'rgba(255,232,180,1)'); grd2.addColorStop(.45,'rgba(255,214,150,.45)');
+        grd2.addColorStop(1,'rgba(255,214,150,0)');
         dg2.fillStyle=grd2; dg2.fillRect(0,0,64,64);
-        tessPtsMat=new THREE.PointsMaterial({color:0xffe2ae,size:.5,transparent:true,
+        var pm=new THREE.PointsMaterial({color:0xffdf9e,size:.42,transparent:true,
           opacity:0,map:new THREE.CanvasTexture(dc2),depthWrite:false,
           blending:THREE.AdditiveBlending});
-        tessGroup.add(new THREE.Points(pg,tessPtsMat));
-        tessGroup.userData.cell=CELL;
+        var pts=new THREE.Points(pg,pm);
+        pts.userData={mat:pm,cell:cell,speed:1};
+        tessGroup.add(pts);
+        tessLayers.push(pts);
       })();
-      tessGroup.position.set(0,0,-16);
+      tessGroup.position.set(0,0,-18);
       tessGroup.visible=false;
       scene.add(tessGroup);
 
@@ -144,7 +184,33 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
         var pct=Math.round(journey*100);
         if(dmFill) dmFill.style.height=pct+'%';
         if(dmMarker) dmMarker.style.top=pct+'%';
-        if(dmStage){ var s=stages[0][1],h=stages[0][2];
+        
+        /* ===== TESSERACT LIVE DEMO PANEL ===== */
+        var tdDemo=document.getElementById('tessDemo');
+        if(tdDemo && !EMBED_MODE){
+          var inDemoZone = journey>=.44 && journey<=.60;
+          var dismissed = tdDemo.dataset.dismissed==='1';
+          if(inDemoZone && !dismissed && !tdDemo.classList.contains('explore')){
+            if(!tdDemo.classList.contains('on')){ tdDemo.classList.add('on'); tdDemo.setAttribute('aria-hidden','false'); }
+          } else if(!tdDemo.classList.contains('explore')){
+            tdDemo.classList.remove('on'); tdDemo.setAttribute('aria-hidden','true');
+            if(!inDemoZone) tdDemo.dataset.dismissed='';
+          }
+          // iframe fallback: jika 9 detik tidak load, tampilkan pesan
+          var tdFrame=document.getElementById('tdFrame'), tdFb=document.getElementById('tdFallback');
+          if(tdFrame && !tdFrame.dataset.watch){
+            tdFrame.dataset.watch='1';
+            setTimeout(function(){
+              try{
+                var ok = tdFrame.contentDocument || tdFrame.contentWindow;
+                if(!ok && tdFb){ tdFb.hidden=false; }
+              }catch(e){ /* cross-origin = loaded, abaikan */ }
+            }, 9000);
+            tdFrame.addEventListener('error', function(){ if(tdFb) tdFb.hidden=false; });
+          }
+        }
+
+if(dmStage){ var s=stages[0][1],h=stages[0][2];
           for(var k=0;k<stages.length;k++) if(journey>=stages[k][0]){s=stages[k][1];h=stages[k][2];}
           if(dmStage.textContent!==s) dmStage.textContent=s;
           var dh=document.getElementById('dmHint');
@@ -174,18 +240,23 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
           var _bhC=document.getElementById('bh');
           if(_bhC) _bhC.style.opacity=Math.max(0,1-Math.max(0,(journey-.3)/.08)).toFixed(3);
         }
-        // TESSERACT: kisi tak berujung — fade in, melayang melewatinya, fade out
-        var tessIn=Math.max(0,Math.min((journey-.33)/.07,1)),
-            tessOut=Math.max(0,Math.min((journey-.6)/.07,1));
+        // TESSERACT v3: scroll menggerakkan kamera menembus lapisan (parallax nyata)
+        var tessIn=Math.max(0,Math.min((journey-.32)/.07,1)),
+            tessOut=Math.max(0,Math.min((journey-.62)/.07,1));
         var tessOp=tessIn*(1-tessOut);
+        var tessProg=Math.max(0,Math.min((journey-.32)/(.62-.32),1));
         tessGroup.visible=tessOp>0.01;
         if(tessGroup.visible){
-          tessLineMat.opacity=tessOp*.5;
-          tessPtsMat.opacity=tessOp*.8;
-          // drift maju tanpa henti (loop mulus per sel)
-          var drift=(t*.9)%tessGroup.userData.cell;
-          tessGroup.position.z=-16+drift;
-          tessGroup.rotation.y=Math.sin(t*.08)*.04+mx*.06;
+          for(var li2=0;li2<tessLayers.length;li2++){
+            var L=tessLayers[li2], ud=L.userData;
+            var raw=(tessProg*ud.cell*7 + t*.55*ud.speed) % ud.cell;
+            L.position.z=((raw%ud.cell)+ud.cell)%ud.cell - ud.cell/2;
+            L.rotation.y=Math.sin(t*.07)*.035*ud.speed + mx*.05*ud.speed;
+            L.rotation.x=Math.cos(t*.06)*.02*ud.speed + my*.03*ud.speed;
+            var op=tessOp*(ud.baseOp!==undefined?ud.baseOp:.8);
+            if(ud.mats){ ud.mats[0].opacity=op; ud.mats[1].opacity=Math.min(1,op*1.5); }
+            else if(ud.mat){ ud.mat.opacity=tessOp*.85; }
+          }
         }
 
         // WORMHOLE: 35%→85% — cincin berdenyut mendekat
@@ -526,4 +597,40 @@ var t0=performance.now(),lastT=0;
   gl.drawArrays(gl.TRIANGLES,0,3);
   requestAnimationFrame(frame);
 })();
+})();
+
+/* ---------- TESSERACT DEMO controls ---------- */
+(function(){
+  if(/[?&]embed=1/.test(location.search)) return; // tidak ada panel di dalam iframe
+  var d=document.getElementById('tessDemo'); if(!d) return;
+  var explore=document.getElementById('tdExplore'),
+      back=document.getElementById('tdBack'),
+      close=document.getElementById('tdClose');
+  function lockScroll(l){
+    document.documentElement.style.overflow = l?'hidden':'';
+    document.body.style.overflow = l?'hidden':'';
+  }
+  if(explore) explore.addEventListener('click', function(){
+    d.classList.add('explore');
+    if(back) back.hidden=false;
+    explore.hidden=true;
+    lockScroll(true);
+  });
+  function exitExplore(){
+    d.classList.remove('explore');
+    if(back) back.hidden=true;
+    if(explore) explore.hidden=false;
+    lockScroll(false);
+  }
+  if(back) back.addEventListener('click', exitExplore);
+  if(close) close.addEventListener('click', function(){
+    exitExplore();
+    d.classList.remove('on'); d.classList.add('off');
+    d.dataset.dismissed='1';
+    d.setAttribute('aria-hidden','true');
+    setTimeout(function(){ d.classList.remove('off'); }, 600);
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key==='Escape' && d.classList.contains('explore')) exitExplore();
+  });
 })();
