@@ -208,7 +208,7 @@
         <h2 class="sec-title scramble">Inside the<br><em>workshop.</em></h2>
         <p class="sec-desc">Enam ruangan, enam eksplorasi. Setiap karya adalah studi desain orisinal — dilabeli dengan jelas sebagai proyek konsep, tanpa klaim berlebihan.</p>
       </div>
-      <div class="sec-count mono">ROOMS 06</div>
+      <div class="sec-count mono"><span id="roomCur">01</span> / 06 ROOMS</div>
     </div>
     <div class="room-slider">
       <button class="slider-btn slider-prev mono" aria-label="Karya sebelumnya">←</button>
@@ -536,5 +536,10 @@
 
 <script src="app.js?v=20261017a"></script>
 <script data-goatcounter="https://marwan-jasa.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+<div id="warp" aria-hidden="true">
+  <canvas id="warpCanvas"></canvas>
+  <p class="warp-text mono"><span class="gold">TRANSIT</span> — KEMBALI KE ASAL</p>
+  <p class="warp-skip mono">ESC untuk lewati</p>
+</div>
 </body>
 </html>
