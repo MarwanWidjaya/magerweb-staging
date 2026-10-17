@@ -420,3 +420,20 @@ section[id]{scroll-margin-top:80px}
 .td-actions{display:flex;gap:.7rem;padding:.9rem 1rem;border-top:1px solid rgba(233,161,59,.25);
   flex-wrap:wrap;background:rgba(0,0,0,.4)}
 @media(max-width:640px){.td-actions .btn{font-size:.72rem;padding:.7rem .9rem}}
+
+/* ============ READABILITY: scrim ala poggufanz ============ */
+/* Redupkan kanvas 3D agar tidak bertarung dengan teks */
+#stars{opacity:.85}
+#stars::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 30%,rgba(5,5,7,.55) 100%);pointer-events:none}
+/* Scrim di belakang konten tiap section */
+.section{position:relative}
+.section .wrap{position:relative;z-index:2}
+.section::before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse 90% 70% at 50% 40%,rgba(5,5,7,.72) 0%,rgba(5,5,7,.35) 55%,transparent 100%)}
+/* Hero: teks di atas black hole harus tegas */
+.hero .wrap{position:relative;z-index:3;text-shadow:0 2px 24px rgba(0,0,0,.8)}
+/* Pastikan heading selalu off-white solid */
+.sec-title,.hero h1{color:#F2EFE6}
+/* Label mono: abu konsisten */
+.sec-index,.mono{color:#8A8A8A}
+.sec-index b,.sec-index .gold{color:#E9A13B}
