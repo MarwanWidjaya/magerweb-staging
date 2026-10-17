@@ -127,35 +127,61 @@ var EMBED_MODE = /[?&]embed=1/.test(location.search);
       }
       addTessLayer(3.5, 11, 1.0, .55);
       addTessLayer(7, 9, .45, .30);
-      /* --- RAK BUKU ala Interstellar: deretan vertikal di tiap sel lapis dekat ---
-         yang bikin langsung dikenali sebagai tesseract: bukan garis abstrak,
-         tapi rak-rak buku tak berujung seperti kamar Murph. */
-      (function addBookshelves(){
-        var cell=3.5, grid=11, half=(grid*cell)/2;
-        var v=[], x, y, z, s;
-        // tiap sel: 5 bilah vertikal (punggung buku) di sisi kiri-kanan sel
-        for(x=1;x<grid;x+=2) for(y=0;y<grid;y+=2) for(z=1;z<grid;z+=2){
-          var bx=-half+x*cell, by=-half+y*cell, bz=-half+z*cell;
-          for(s=0;s<5;s++){
-            var off=(s-2)*cell*.16;
-            // bilah kiri
-            v.push(bx-cell/2, by, bz+off,  bx-cell/2, by+cell*.9, bz+off);
-            // bilah kanan
-            v.push(bx+cell/2, by, bz+off,  bx+cell/2, by+cell*.9, bz+off);
-          }
-          // ambalan horizontal tiap sel
-          v.push(bx-cell/2, by+cell*.45, bz-cell*.4,  bx+cell/2, by+cell*.45, bz-cell*.4);
-          v.push(bx-cell/2, by+cell*.9, bz-cell*.4,   bx+cell/2, by+cell*.9, bz-cell*.4);
+      /* --- RAK BUKU SOLID ala Interstellar: rak kayu + buku 3D beneran ---
+         InstancedMesh (2 draw call) — kebaca sebagai rak buku di layar HP. */
+      (function addSolidBookshelves(){
+        var cell=4, nx=7, ny=4, nz=9;
+        var shelfGeo=new THREE.BoxGeometry(cell*.92, .1, .55);
+        var bookGeo=new THREE.BoxGeometry(.14, .62, .4);
+        var shelfMat=new THREE.MeshBasicMaterial({color:0x6b4a2e});
+        var bookMat=new THREE.MeshBasicMaterial({color:0xffffff});
+        var units=[];
+        var cx, cy, cz;
+        for(cx=0;cx<nx;cx++) for(cy=0;cy<ny;cy++) for(cz=0;cz<nz;cz++){
+          var px=(cx-(nx-1)/2)*cell, py=(cy-(ny-1)/2)*cell, pz=(cz-(nz-1)/2)*cell;
+          if(Math.abs(px)<cell*.7 && Math.abs(py)<cell*.7) continue; // koridor tengah kosong
+          units.push([px,py,pz]);
         }
-        var g=new THREE.BufferGeometry();
-        g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(v),3));
-        // warna: cokelat kayu hangat, redup di tepi via fog
-        var m=new THREE.LineBasicMaterial({color:0x9a6b3f,transparent:true,opacity:0});
-        var lines=new THREE.LineSegments(g,m);
-        lines.userData={mat:m,cell:cell,speed:1,baseOp:.5};
-        tessGroup.add(lines);
-        tessLayers.push(lines);
+        var shelvesPerUnit=4, booksPerShelf=7;
+        var shelfMesh=new THREE.InstancedMesh(shelfGeo, shelfMat, units.length*shelvesPerUnit);
+        var bookMesh=new THREE.InstancedMesh(bookGeo, bookMat, units.length*shelvesPerUnit*booksPerShelf);
+        var dummy=new THREE.Object3D(), col=new THREE.Color();
+        var si=0, bi=0;
+        var palette=[0x8a5a33,0xa06a3a,0x7a4a28,0xb57a45,0x5e3a22,0x96703f,0x6e452a,0xc08a50];
+        units.forEach(function(u){
+          for(var s=0;s<shelvesPerUnit;s++){
+            var sy=u[1]-cell*.35+s*(cell*.7/(shelvesPerUnit-1));
+            dummy.position.set(u[0],sy,u[2]);
+            dummy.rotation.set(0,0,0); dummy.updateMatrix();
+            shelfMesh.setMatrixAt(si++,dummy.matrix);
+            for(var b=0;b<booksPerShelf;b++){
+              var bx=u[0]-cell*.38+b*(cell*.76/(booksPerShelf-1))+(Math.random()-.5)*.05;
+              dummy.position.set(bx, sy+.36, u[2]+(Math.random()-.5)*.06);
+              dummy.scale.set(1,.85+Math.random()*.3,1);
+              dummy.rotation.set(0,(Math.random()-.5)*.08,0);
+              dummy.updateMatrix();
+              bookMesh.setMatrixAt(bi,dummy.matrix);
+              col.setHex(palette[(Math.random()*palette.length)|0]);
+              col.multiplyScalar(.75+Math.random()*.5);
+              bookMesh.setColorAt(bi,col);
+              bi++;
+            }
+            dummy.scale.set(1,1,1);
+          }
+        });
+        shelfMesh.count=si; bookMesh.count=bi;
+        shelfMesh.instanceMatrix.needsUpdate=true; bookMesh.instanceMatrix.needsUpdate=true;
+        if(bookMesh.instanceColor) bookMesh.instanceColor.needsUpdate=true;
+        var sm=new THREE.MeshBasicMaterial({color:0x6b4a2e,transparent:true,opacity:0});
+        var bm=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0});
+        shelfMesh.material=sm; bookMesh.material=bm;
+        var grp=new THREE.Group();
+        grp.add(shelfMesh); grp.add(bookMesh);
+        grp.userData={mats:[sm,bm],cell:cell*3,speed:1,baseOp:.95};
+        tessGroup.add(grp);
+        tessLayers.push(grp);
       })();
+
       (function(){
         var cell=3.5, grid=11, half=(grid*cell)/2, pv=[], x, y, z;
         for(x=0;x<=grid;x+=2) for(y=0;y<=grid;y+=2) for(z=0;z<=grid;z+=2)
