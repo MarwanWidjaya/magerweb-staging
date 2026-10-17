@@ -215,52 +215,6 @@ var EMBED_MODE = /[?&]embed=1/.test(location.search);
         if(dmFill) dmFill.style.height=pct+'%';
         if(dmMarker) dmMarker.style.top=pct+'%';
         
-        /* ===== TESSERACT LIVE DEMO PANEL (bulletproof trigger) ===== */
-        (function(){
-          var tdDemo=document.getElementById('tessDemo');
-          if(!tdDemo || EMBED_MODE) return;
-          if(tdDemo.dataset.init==='1') return;
-          tdDemo.dataset.init='1';
-          var inZone=false, dismissed=false;
-          function show(){
-            if(dismissed || tdDemo.classList.contains('explore')) return;
-            if(!tdDemo.classList.contains('on')){
-              tdDemo.classList.add('on'); tdDemo.setAttribute('aria-hidden','false');
-              var lf=document.getElementById('tdFrame');
-              if(lf && !lf.src){ lf.src='https://marwanwidjaya.github.io/magerweb/?embed=1'; }
-            }
-          }
-          function hide(){
-            if(tdDemo.classList.contains('explore')) return;
-            tdDemo.classList.remove('on'); tdDemo.setAttribute('aria-hidden','true');
-          }
-          function evalZone(){
-            // Mekanisme 1: journey range (lebar)
-            var jz = journey>=.35 && journey<=.65;
-            // Mekanisme 2: section #why/#process terlihat (backup)
-            var sz = false;
-            try{
-              var w=document.getElementById('why'), p=document.getElementById('process');
-              [w,p].forEach(function(el){
-                if(!el) return;
-                var r=el.getBoundingClientRect();
-                if(r.top<window.innerHeight*.7 && r.bottom>window.innerHeight*.3) sz=true;
-              });
-            }catch(e){}
-            var nz = jz || sz;
-            if(nz && !inZone){ inZone=true; dismissed=false; show(); }
-            else if(!nz && inZone){ inZone=false; hide(); }
-          }
-          // cek berkala (tidak bergantung pada event scroll)
-          setInterval(evalZone, 400);
-          window.addEventListener('scroll', evalZone, {passive:true});
-          // tombol tutup manual
-          var c=document.getElementById('tdClose');
-          if(c) c.addEventListener('click', function(){
-            dismissed=true; hide();
-            tdDemo.dataset.dismissed='1';
-          });
-        })();
 
 if(dmStage){ var s=stages[0][1],h=stages[0][2];
           for(var k=0;k<stages.length;k++) if(journey>=stages[k][0]){s=stages[k][1];h=stages[k][2];}
@@ -686,4 +640,51 @@ var t0=performance.now(),lastT=0;
   document.addEventListener('keydown', function(e){
     if(e.key==='Escape' && d.classList.contains('explore')) exitExplore();
   });
+})();
+
+/* ===== TESSERACT DEMO — standalone trigger (tidak bergantung pada journey/onScroll) ===== */
+(function(){
+  if(/[?&]embed=1/.test(location.search)) return;
+  var d=document.getElementById('tessDemo');
+  if(!d || d.dataset.standalone==='1') return;
+  d.dataset.standalone='1';
+  var inZone=false, dismissed=false;
+  function show(){
+    if(dismissed || d.classList.contains('explore')) return;
+    if(!d.classList.contains('on')){
+      d.classList.add('on'); d.setAttribute('aria-hidden','false');
+      var lf=document.getElementById('tdFrame');
+      if(lf && !lf.getAttribute('src')) lf.src='https://marwanwidjaya.github.io/magerweb/?embed=1';
+    }
+  }
+  function hide(){
+    if(d.classList.contains('explore')) return;
+    d.classList.remove('on'); d.setAttribute('aria-hidden','true');
+  }
+  function check(){
+    var nz=false;
+    try{
+      ['why','process'].forEach(function(id){
+        var el=document.getElementById(id);
+        if(!el) return;
+        var r=el.getBoundingClientRect(), vh=window.innerHeight;
+        if(r.top<vh*.75 && r.bottom>vh*.25) nz=true;
+      });
+    }catch(e){}
+    // fallback: posisi scroll tengah halaman
+    if(!nz){
+      try{
+        var max=document.documentElement.scrollHeight-window.innerHeight;
+        var j=max>0?window.scrollY/max:0;
+        if(j>=.3 && j<=.7) nz=true;
+      }catch(e){}
+    }
+    if(nz && !inZone){ inZone=true; dismissed=false; show(); }
+    else if(!nz && inZone){ inZone=false; hide(); }
+  }
+  setInterval(check, 500);
+  window.addEventListener('scroll', check, {passive:true});
+  check();
+  var c=document.getElementById('tdClose');
+  if(c) c.addEventListener('click', function(){ dismissed=true; hide(); });
 })();
