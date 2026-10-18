@@ -29,7 +29,10 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
     var len=orig.length, frame=0;
     var q=[];
     for(var i=0;i<len;i++) q.push({c:orig[i], start:(Math.random()*15)|0, end:((Math.random()*15)|0)+18});
+    var startMs=performance.now();
     (function update(){
+      // safety: paksa selesai setelah 3 detik
+      if(performance.now()-startMs>3000){ node.textContent=orig; done(); return; }
       var out='', n=0;
       for(var i=0;i<len;i++){
         if(frame>=q[i].end){ n++; out+=q[i].c; }
@@ -79,412 +82,197 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
 var EMBED_MODE = /[?&]embed=1/.test(location.search);
 
 /* ---------- 3D COSMIC JOURNEY: black hole → wormhole → tesseract ---------- */
+
+/* Main-thread 3D fallback (jika worker gagal) */
+function initMainThread3D(canvas, isMobile){
+  try{
+    var renderer=new THREE.WebGLRenderer({canvas:canvas,alpha:true,antialias:!isMobile});
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, isMobile?1.5:2));
+    renderer.setSize(window.innerWidth,window.innerHeight);
+    var scene=new THREE.Scene();
+    scene.fog=new THREE.FogExp2(0x060503,0.011);
+    var camera=new THREE.PerspectiveCamera(62,window.innerWidth/window.innerHeight,.1,900);
+    // Black hole (fallback sederhana)
+    var bh=new THREE.Group();
+    bh.add(new THREE.Mesh(new THREE.SphereGeometry(3.2,32,32),
+      new THREE.MeshBasicMaterial({color:0x000000})));
+    var disk=new THREE.Mesh(new THREE.RingGeometry(3.7,8.6,64),
+      new THREE.MeshBasicMaterial({color:0xE9A13B,transparent:true,opacity:.9,side:THREE.DoubleSide}));
+    disk.rotation.x=-Math.PI/2.25; bh.add(disk);
+    var halo=new THREE.Mesh(new THREE.RingGeometry(3.4,10.5,64),
+      new THREE.MeshBasicMaterial({color:0xd98a3a,transparent:true,opacity:.16,
+        side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));
+    halo.rotation.x=-Math.PI/2.25; bh.add(halo);
+    scene.add(bh);
+    // Tesseract fallback: rak buku sederhana di koridor
+    var tess=new THREE.Group();
+    tess.add(new THREE.AmbientLight(0x9a7a55,1.1));
+    var key=new THREE.DirectionalLight(0xffd9a0,1.4); key.position.set(12,18,8); tess.add(key);
+    var wood=new THREE.MeshStandardMaterial({color:0x9a6535,roughness:.7});
+    var shelfG=new THREE.BoxGeometry(4.4,.22,1.3);
+    var dummy=new THREE.Object3D(); var n=0;
+    var fallShelf=new THREE.InstancedMesh(shelfG,wood,200);
+    for(var z=-190;z>=-600&&n<200;z-=16){
+      for(var sd=0;sd<4&&n<200;sd++){
+        dummy.rotation.set(0,0,0); dummy.scale.set(1,1,1);
+        if(sd===0) dummy.position.set(-7,(n%3-1)*2.6,z);
+        else if(sd===1) dummy.position.set(7,(n%3-1)*2.6,z);
+        else if(sd===2) dummy.position.set((n%3-1)*2.6,7,z);
+        else dummy.position.set((n%3-1)*2.6,-7,z);
+        dummy.updateMatrix(); fallShelf.setMatrixAt(n++,dummy.matrix);
+      }
+    }
+    fallShelf.count=n; fallShelf.instanceMatrix.needsUpdate=true;
+    tess.add(fallShelf); tess.visible=false; scene.add(tess);
+    // Stars
+    var sc=isMobile?700:1600, sp=new Float32Array(sc*3);
+    for(var i=0;i<sc;i++){sp[i*3]=(Math.random()-.5)*420;sp[i*3+1]=(Math.random()-.5)*420;sp[i*3+2]=40-Math.random()*480;}
+    var sg=new THREE.BufferGeometry(); sg.setAttribute('position',new THREE.BufferAttribute(sp,3));
+    var stars=new THREE.Points(sg,new THREE.PointsMaterial({color:0xcfd8ff,size:.75,transparent:true,opacity:.85}));
+    scene.add(stars);
+    var journey=0, tj=0;
+    window.addEventListener('scroll',function(){
+      var max=document.documentElement.scrollHeight-window.innerHeight;
+      tj=max>0?window.scrollY/max:0;
+    },{passive:true});
+    (function anim(t){
+      requestAnimationFrame(anim);
+      journey+=(tj-journey)*.08;
+      var time=(t||0)*.001, j=journey;
+      if(j<.30){
+        var p=j/.30, e=p*p*(3-2*p);
+        camera.position.set(0,0,30-e*26); camera.lookAt(0,.4,0);
+        var s=(1+e*2.1)*(1+Math.sin(time*.8)*.015); bh.scale.set(s,s,s);
+        bh.visible=true; tess.visible=false; stars.visible=true;
+        disk.rotation.z=time*.12;
+      } else if(j<.44){
+        var p2=(j-.30)/.14;
+        camera.position.set(0,.3,4-p2*10); camera.lookAt(0,.4,-20);
+        camera.fov=62+Math.sin(p2*Math.PI)*43; camera.updateProjectionMatrix();
+        bh.scale.multiplyScalar(1.06); stars.visible=true;
+      } else {
+        var p3=(j-.44)/.56;
+        camera.position.set(0,Math.sin(time*.25)*.12,-172-p3*380);
+        camera.lookAt(0,0,-212-p3*380);
+        camera.fov=62; camera.updateProjectionMatrix();
+        bh.visible=false; stars.visible=false; tess.visible=true;
+      }
+      renderer.render(scene,camera);
+    })();
+  }catch(e){}
+}
+
 (function(){
   var canvas=document.getElementById('stars');
   if(!canvas) return;
-  if(EMBED_MODE){ return; } // demo iframe: konten saja, tanpa WebGL
+  if(EMBED_MODE){ return; }
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var isMobile = window.innerWidth<640;
+  if(reduceMotion || !window.THREE) return;
 
-  if(window.THREE && !reduceMotion){
-    try{
-      var renderer=new THREE.WebGLRenderer({canvas:canvas,alpha:true,antialias:!isMobile});
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, isMobile?1.5:2));
-      renderer.setSize(window.innerWidth,window.innerHeight);
-      var scene=new THREE.Scene();
-      scene.fog=new THREE.FogExp2(0x050507,0.02);
-      var camera=new THREE.PerspectiveCamera(62,window.innerWidth/window.innerHeight,.1,220);
-      camera.position.set(0,0,26);
+  var journey=0, targetJourney=0, worker=null, useWorker=false;
 
-      /* ===== STARFIELD ===== */
-      var COUNT=EMBED_MODE?500:(isMobile?900:2200);
-      var pos=new Float32Array(COUNT*3), col=new Float32Array(COUNT*3);
-      var lime=new THREE.Color('#C6F24E'), white=new THREE.Color('#ffffff'),
-          cyan=new THREE.Color('#7dd3fc'), gold=new THREE.Color('#E9A13B'), tmp=new THREE.Color();
-      for(var i=0;i<COUNT;i++){
-        var r=18+Math.random()*60, th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
-        pos[i*3]=r*Math.sin(ph)*Math.cos(th);
-        pos[i*3+1]=r*Math.sin(ph)*Math.sin(th);
-        pos[i*3+2]=r*Math.cos(ph)-20;
-        var pick=Math.random();
-        if(pick<.1) tmp.copy(lime); else if(pick<.15) tmp.copy(cyan);
-        else if(pick<.18) tmp.copy(gold); else tmp.copy(white);
-        tmp.multiplyScalar(.45+Math.random()*.55);
-        col[i*3]=tmp.r; col[i*3+1]=tmp.g; col[i*3+2]=tmp.b;
-      }
-      var geo=new THREE.BufferGeometry();
-      geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
-      geo.setAttribute('color',new THREE.BufferAttribute(col,3));
-      var dotCv=document.createElement('canvas'); dotCv.width=dotCv.height=64;
-      var dg=dotCv.getContext('2d'), dgrd=dg.createRadialGradient(32,32,0,32,32,32);
-      dgrd.addColorStop(0,'rgba(255,255,255,1)'); dgrd.addColorStop(.4,'rgba(255,255,255,.9)');
-      dgrd.addColorStop(1,'rgba(255,255,255,0)');
-      dg.fillStyle=dgrd; dg.fillRect(0,0,64,64);
-      var starMat=new THREE.PointsMaterial({size:.85,vertexColors:true,transparent:true,
-        opacity:.95,sizeAttenuation:true,depthWrite:false,map:new THREE.CanvasTexture(dotCv)});
-      var stars=new THREE.Points(geo,starMat);
-      scene.add(stars);
-      var mwPts=null;
-
-      /* ===== MILKY WAY BAND: pita galaxy diagonal ===== */
-      (function(){
-        var MW=900, mpos=new Float32Array(MW*3), mcol=new Float32Array(MW*3);
-        var mwC1=new THREE.Color('#8b7bd8'), mwC2=new THREE.Color('#e8b4d8'),
-            mwC3=new THREE.Color('#7dd3fc'), tc=new THREE.Color();
-        for(var k=0;k<MW;k++){
-          var px=-60+Math.random()*120;
-          var py=px*.42+(Math.random()+Math.random()+Math.random()-1.5)*16;
-          var pz=-20-Math.random()*50;
-          mpos[k*3]=px; mpos[k*3+1]=py; mpos[k*3+2]=pz;
-          var pk=Math.random();
-          tc.copy(pk<.4?mwC1:(pk<.7?mwC2:mwC3));
-          tc.multiplyScalar(.25+Math.random()*.5);
-          mcol[k*3]=tc.r; mcol[k*3+1]=tc.g; mcol[k*3+2]=tc.b;
-        }
-        var mg=new THREE.BufferGeometry();
-        mg.setAttribute('position',new THREE.BufferAttribute(mpos,3));
-        mg.setAttribute('color',new THREE.BufferAttribute(mcol,3));
-        var dotTex2=new THREE.CanvasTexture(dotCv);
-        var mm=new THREE.PointsMaterial({size:.7,vertexColors:true,transparent:true,
-          opacity:.75,map:dotTex2,depthWrite:false,blending:THREE.AdditiveBlending});
-        var mw=new THREE.Points(mg,mm);
-        mw.userData={mat:mm};
-        scene.add(mw);
-        mwPts=mw;
-      })();
-      nebula('rgba(139,123,216,0.35)',-18,10,60,.14);
-      nebula('rgba(232,180,216,0.28)',20,-8,55,.12);
-
-      /* black hole kini via ray-traced shader (#bh) */
-
-      /* ===== WORMHOLE — cincin cahaya berdenyut ===== */
-      var rings=[];
-      for(var w=0;w<14;w++){
-        var ring=new THREE.Mesh(new THREE.TorusGeometry(6+w*1.7,.08,8,isMobile?32:64),
-          new THREE.MeshBasicMaterial({color:0xC6F24E,transparent:true,opacity:0,
-            depthWrite:false,blending:THREE.AdditiveBlending}));
-        ring.position.z=-40-w*9;
-        scene.add(ring); rings.push(ring);
-      }
-
-                  /* ===== TESSERACT v3 — ruang berlapis ala Interstellar =====
-         Lapisan dekat (rapat, terang) + lapisan jauh (jarang, redup) = parallax nyata.
-         Warna vertex: amber hangat di koridor tengah → cokelat gelap di tepi. */
-      var tessGroup=new THREE.Group();
-      var tessLayers=[];
-      function latticeGeom(cell, grid, accentEvery){
-        var half=(grid*cell)/2, v=[], a=[];
-        function push(arr,px1,py1,pz1,px2,py2,pz2){arr.push(px1,py1,pz1,px2,py2,pz2);}
-        var x,y,z;
-        for(y=0;y<=grid;y++) for(z=0;z<=grid;z++)
-          push((y%accentEvery===0&&z%accentEvery===0)?a:v,
-            -half,-half+y*cell,-half+z*cell, half,-half+y*cell,-half+z*cell);
-        for(x=0;x<=grid;x++) for(z=0;z<=grid;z++)
-          push((x%accentEvery===0&&z%accentEvery===0)?a:v,
-            -half+x*cell,-half,-half+z*cell, -half+x*cell,half,-half+z*cell);
-        for(x=0;x<=grid;x++) for(y=0;y<=grid;y++)
-          push((x%accentEvery===0&&y%accentEvery===0)?a:v,
-            -half+x*cell,-half+y*cell,-half, -half+x*cell,-half+y*cell,half);
-        function paint(arr, bright){
-          var col=new Float32Array(arr.length);
-          var warm=[.98,.74,.42], dark=[.14,.09,.05];
-          for(var i=0;i<arr.length;i+=3){
-            var d=Math.sqrt(arr[i]*arr[i]+arr[i+1]*arr[i+1])/(half*1.15);
-            d=Math.min(1,d);
-            var f=Math.pow(1-d,1.7)*bright;
-            col[i]=dark[0]+(warm[0]-dark[0])*f;
-            col[i+1]=dark[1]+(warm[1]-dark[1])*f;
-            col[i+2]=dark[2]+(warm[2]-dark[2])*f;
-          }
-          var g=new THREE.BufferGeometry();
-          g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(arr),3));
-          g.setAttribute('color',new THREE.BufferAttribute(col,3));
-          return g;
-        }
-        return {base:paint(v,.55), accent:paint(a,.8)};
-      }
-      function addTessLayer(cell, grid, speed, baseOp){
-        var G=latticeGeom(cell,grid,3);
-        var grp=new THREE.Group();
-        var m1=new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0});
-        var m2=new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0});
-        grp.add(new THREE.LineSegments(G.base,m1));
-        grp.add(new THREE.LineSegments(G.accent,m2));
-        grp.userData={cell:cell,speed:speed,mats:[m1,m2],baseOp:baseOp};
-        tessGroup.add(grp);
-        tessLayers.push(grp);
-        return grp;
-      }
-      addTessLayer(3.5, 8, 1.0, .22);
-      addTessLayer(7, 9, .45, .12);
-      /* --- RAK BUKU SOLID ala Interstellar: rak kayu + buku 3D beneran ---
-         InstancedMesh (2 draw call) — kebaca sebagai rak buku di layar HP. */
-      (function addSolidBookshelves(){
-        // Tekstur kayu prosedural
-        var woodCv=new OffscreenCanvas(128,128);
-        var wg=woodCv.getContext('2d');
-        wg.fillStyle='#7a5230'; wg.fillRect(0,0,128,128);
-        for(var wi=0;wi<40;wi++){
-          wg.strokeStyle='rgba('+(40+Math.random()*30|0)+','+(25+Math.random()*20|0)+',10,'+(.15+Math.random()*.25)+')';
-          wg.lineWidth=.5+Math.random()*1.5;
-          wg.beginPath();
-          var wy=Math.random()*128;
-          wg.moveTo(0,wy);
-          wg.bezierCurveTo(40,wy+(Math.random()-.5)*8, 80,wy+(Math.random()-.5)*8, 128,wy+(Math.random()-.5)*4);
-          wg.stroke();
-        }
-        var woodTex=new THREE.CanvasTexture(woodCv);
-        woodTex.wrapS=woodTex.wrapT=THREE.RepeatWrapping;
-
-        // Material dengan LIGHTING (bukan flat)
-        var shelfMat=new THREE.MeshLambertMaterial({map:woodTex, color:0xb98a5a});
-        var bookMat=new THREE.MeshLambertMaterial({color:0xffffff});
-
-        // Lampu hangat di koridor
-        var warm1=new THREE.PointLight(0xffb45e, 1.2, 40); warm1.position.set(0,2,-14); scene.add(warm1);
-        var warm2=new THREE.PointLight(0xff9a3e, .8, 40); warm2.position.set(0,-2,-22); scene.add(warm2);
-        var amb=new THREE.AmbientLight(0x604030, .7); scene.add(amb);
-
-        var cell=4, nx=5, ny=3, nz=7;
-        var shelfGeo=new THREE.BoxGeometry(cell*.92, .12, .6);
-        var sideGeo=new THREE.BoxGeometry(.12, cell*.85, .6);
-        var backGeo=new THREE.BoxGeometry(cell*.92, cell*.85, .06);
-        var bookGeo=new THREE.BoxGeometry(.15, .62, .42);
-
-        var units=[];
-        for(var cx=0;cx<nx;cx++) for(var cy=0;cy<ny;cy++) for(var cz=0;cz<nz;cz++){
-          var px=(cx-(nx-1)/2)*cell, py=(cy-(ny-1)/2)*cell, pz=(cz-(nz-1)/2)*cell;
-          if(Math.abs(px)<cell*.7 && Math.abs(py)<cell*.7) continue;
-          units.push([px,py,pz]);
-        }
-        var shelvesPerUnit=4, booksPerShelf=8;
-        var nU=units.length;
-        var shelfMesh=new THREE.InstancedMesh(shelfGeo, shelfMat, nU*shelvesPerUnit);
-        var sideMesh=new THREE.InstancedMesh(sideGeo, shelfMat, nU*2);
-        var backMesh=new THREE.InstancedMesh(backGeo, shelfMat, nU);
-        var bookMesh=new THREE.InstancedMesh(bookGeo, bookMat, nU*shelvesPerUnit*booksPerShelf);
-
-        var dummy=new THREE.Object3D(), col=new THREE.Color();
-        var si=0, di=0, ki=0, bi=0;
-        // Palet buku lebih kaya (kayak rak beneran)
-        var palette=[0x8a5a33,0xa06a3a,0x7a4a28,0xb57a45,0x5e3a22,0x96703f,0x6e452a,0xc08a50,
-                     0x4a6a8a,0x8a4a5a,0x3a6a4a,0xd4a95a,0x2a3a5a,0x9a3a2a,0xe8d5b0,0x5a4a6a];
-        units.forEach(function(u){
-          // panel samping (kiri-kanan)
-          [-1,1].forEach(function(sgn){
-            dummy.position.set(u[0]+sgn*cell*.44, u[1], u[2]);
-            dummy.rotation.set(0,0,0); dummy.scale.set(1,1,1); dummy.updateMatrix();
-            sideMesh.setMatrixAt(di++,dummy.matrix);
-          });
-          // panel belakang
-          dummy.position.set(u[0], u[1], u[2]-.28);
-          dummy.rotation.set(0,0,0); dummy.scale.set(1,1,1); dummy.updateMatrix();
-          backMesh.setMatrixAt(ki++,dummy.matrix);
-
-          for(var s=0;s<shelvesPerUnit;s++){
-            var sy=u[1]-cell*.35+s*(cell*.7/(shelvesPerUnit-1));
-            dummy.position.set(u[0],sy,u[2]);
-            dummy.rotation.set(0,0,0); dummy.scale.set(1,1,1); dummy.updateMatrix();
-            shelfMesh.setMatrixAt(si++,dummy.matrix);
-            for(var b=0;b<booksPerShelf;b++){
-              // kadang ada slot kosong (natural)
-              if(Math.random()<.12) continue;
-              var bx=u[0]-cell*.38+b*(cell*.76/(booksPerShelf-1))+(Math.random()-.5)*.04;
-              var bh=.75+Math.random()*.45;
-              dummy.position.set(bx, sy+.06+bh*.31, u[2]+(Math.random()-.5)*.05);
-              dummy.scale.set(1,bh,1);
-              dummy.rotation.set(0,(Math.random()-.5)*.1,Math.random()<.08?.12:0);
-              dummy.updateMatrix();
-              bookMesh.setMatrixAt(bi,dummy.matrix);
-              col.setHex(palette[(Math.random()*palette.length)|0]);
-              col.multiplyScalar(.7+Math.random()*.55);
-              bookMesh.setColorAt(bi,col);
-              bi++;
-            }
-            dummy.scale.set(1,1,1);
-          }
-        });
-        shelfMesh.count=si; sideMesh.count=di; backMesh.count=ki; bookMesh.count=bi;
-        shelfMesh.instanceMatrix.needsUpdate=true; sideMesh.instanceMatrix.needsUpdate=true;
-        backMesh.instanceMatrix.needsUpdate=true; bookMesh.instanceMatrix.needsUpdate=true;
-        if(bookMesh.instanceColor) bookMesh.instanceColor.needsUpdate=true;
-
-        // Material transparan untuk fade
-        var sm=shelfMat.clone(); sm.transparent=true; sm.opacity=0;
-        var bm=bookMat.clone(); bm.transparent=true; bm.opacity=0;
-        shelfMesh.material=sm; sideMesh.material=sm; backMesh.material=sm; bookMesh.material=bm;
-
-        var grp=new THREE.Group();
-        grp.add(shelfMesh); grp.add(sideMesh); grp.add(backMesh); grp.add(bookMesh);
-        grp.userData={mats:[sm,bm],cell:cell*3,speed:1,baseOp:.95};
-        tessGroup.add(grp);
-        tessLayers.push(grp);
-      })();
-
-      (function(){
-        var cell=3.5, grid=11, half=(grid*cell)/2, pv=[], x, y, z;
-        for(x=0;x<=grid;x+=2) for(y=0;y<=grid;y+=2) for(z=0;z<=grid;z+=2)
-          pv.push(-half+x*cell,-half+y*cell,-half+z*cell);
-        var pg=new THREE.BufferGeometry();
-        pg.setAttribute('position',new THREE.BufferAttribute(new Float32Array(pv),3));
-        var dc2=document.createElement('canvas'); dc2.width=dc2.height=64;
-        var dg2=dc2.getContext('2d'),
-            grd2=dg2.createRadialGradient(32,32,0,32,32,32);
-        grd2.addColorStop(0,'rgba(255,232,180,1)'); grd2.addColorStop(.45,'rgba(255,214,150,.45)');
-        grd2.addColorStop(1,'rgba(255,214,150,0)');
-        dg2.fillStyle=grd2; dg2.fillRect(0,0,64,64);
-        var pm=new THREE.PointsMaterial({color:0xffdf9e,size:.42,transparent:true,
-          opacity:0,map:new THREE.CanvasTexture(dc2),depthWrite:false,
-          blending:THREE.AdditiveBlending});
-        var pts=new THREE.Points(pg,pm);
-        pts.userData={mat:pm,cell:cell,speed:1};
-        tessGroup.add(pts);
-        tessLayers.push(pts);
-      })();
-      tessGroup.position.set(0,0,-18);
-      tessGroup.visible=false;
-      scene.add(tessGroup);
-
-/* ===== NEBULA ===== */
-      function nebula(colorHex,ox,oy,s,op){
-        var cv=document.createElement('canvas'); cv.width=cv.height=128;
-        var ng=cv.getContext('2d'), grd=ng.createRadialGradient(64,64,0,64,64,64);
-        grd.addColorStop(0,colorHex); grd.addColorStop(1,'rgba(0,0,0,0)');
-        ng.fillStyle=grd; ng.fillRect(0,0,128,128);
-        var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),
-          transparent:true,opacity:op,depthWrite:false}));
-        sp.position.set(ox,oy,-32); sp.scale.set(s,s,1); scene.add(sp);
-      }
-      nebula('rgba(198,242,78,0.5)',-26,14,46,.13);
-      nebula('rgba(125,211,252,0.45)',28,-16,50,.1);
-      nebula('rgba(233,161,59,0.4)',0,-22,40,.08);
-
-      /* ===== JOURNEY: scroll menggerakkan kamera menembus ruang-waktu ===== */
-      var tmx=0,tmy=0,mx=0,my=0,journey=0,lastY=window.scrollY,scrollVel=0;
-      var dmFill=document.getElementById('dmFill'), dmMarker=document.getElementById('dmMarker'),
-          dmStage=document.getElementById('dmStage');
-      var stages=[[0,'CH.00 · THE VOID','SCROLL TO EXPLORE'],
-                  [.14,'CH.01 · THE PROBLEM','EVERY BUSINESS HITS THIS WALL'],
-                  [.28,'CH.02 · TRANSFORMATION','FROM CHAOS TO SYSTEM'],
-                  [.44,'CH.03 · THE WORKS','DESCENDING INTO THE WORK'],
-                  [.66,'CH.04 · THE SERVICES','CHOOSE YOUR MODULE'],
-                  [.86,'CH.05 · NEXT CHAPTER','FIND YOUR NEXT CHAPTER']];
-      window.addEventListener('mousemove',function(e){
-        tmx=(e.clientX/window.innerWidth-.5); tmy=(e.clientY/window.innerHeight-.5);
-      },{passive:true});
-      function onScroll(){
-        var y=window.scrollY, max=document.documentElement.scrollHeight-window.innerHeight;
-        journey=max>0?Math.min(y/max,1):0;
-        scrollVel=Math.abs(y-lastY); lastY=y;
-        var pct=Math.round(journey*100);
-        if(dmFill) dmFill.style.height=pct+'%';
-        if(dmMarker) dmMarker.style.top=pct+'%';
-        
-
-if(dmStage){ var s=stages[0][1],h=stages[0][2];
-          for(var k=0;k<stages.length;k++) if(journey>=stages[k][0]){s=stages[k][1];h=stages[k][2];}
-          if(dmStage.textContent!==s) dmStage.textContent=s;
-          var dh=document.getElementById('dmHint');
-          if(dh&&dh.textContent!==h) dh.textContent=h; }
-      }
-      window.addEventListener('scroll',onScroll,{passive:true}); onScroll();
-      window.addEventListener('resize',function(){
-        camera.aspect=window.innerWidth/window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth,window.innerHeight);
-      });
-
-      var t0=performance.now();
-      (function loop(){
-        var t=(performance.now()-t0)*.001;
-        mx+=(tmx-mx)*.04; my+=(tmy-my)*.04;
-        scrollVel*=.9;
-        var warp=Math.min(scrollVel*.05,1.1);
-
-        stars.rotation.y=t*.016+mx*.35;
-        if(mwPts){ mwPts.rotation.y=t*.008; mwPts.rotation.z=Math.sin(t*.05)*.02; }
-        stars.rotation.x=my*.25+Math.sin(t*.1)*.02;
-        starMat.size=.85+warp*1.7;
-
-        // DIVE: 0→30% — black hole shader (uDive) + fade; kamera 3D utk stars/wormhole
-        var dive=Math.min(journey/.3,1), ease=dive*dive*(3-2*dive);
-        if(window.__bh){ __bh.uDive=dive;
-          var _bhC=document.getElementById('bh');
-          if(_bhC) _bhC.style.opacity=Math.max(0,1-Math.max(0,(journey-.3)/.08)).toFixed(3);
-        }
-        // TESSERACT v3: scroll menggerakkan kamera menembus lapisan (parallax nyata)
-        var tessIn=Math.max(0,Math.min((journey-.32)/.07,1)),
-            tessOut=Math.max(0,Math.min((journey-.62)/.07,1));
-        var tessOp=tessIn*(1-tessOut);
-        var tessProg=Math.max(0,Math.min((journey-.32)/(.62-.32),1));
-        tessGroup.visible=tessOp>0.01;
-        if(tessGroup.visible){
-          for(var li2=0;li2<tessLayers.length;li2++){
-            var L=tessLayers[li2], ud=L.userData;
-            var raw=(tessProg*ud.cell*7 + t*.55*ud.speed) % ud.cell;
-            L.position.z=((raw%ud.cell)+ud.cell)%ud.cell - ud.cell/2;
-            L.rotation.y=Math.sin(t*.07)*.035*ud.speed + mx*.05*ud.speed;
-            L.rotation.x=Math.cos(t*.06)*.02*ud.speed + my*.03*ud.speed;
-            var op=tessOp*(ud.baseOp!==undefined?ud.baseOp:.8);
-            if(ud.mats){ ud.mats[0].opacity=op; ud.mats[1].opacity=Math.min(1,op*1.5); }
-            else if(ud.mat){ ud.mat.opacity=tessOp*(ud.baseOp!==undefined?ud.baseOp:.35); }
-          }
-        }
-
-        // WORMHOLE: 35%→85% — cincin berdenyut mendekat
-        var wh=Math.max(0,Math.min((journey-.35)/.5,1));
-        for(var q=0;q<rings.length;q++){
-          var ph=(t*.65+q*.5)%1;
-          rings[q].material.opacity=wh*.55*(1-ph);
-          var sc=1+ph*2.4; rings[q].scale.set(sc,sc,1);
-          rings[q].position.z=camera.position.z-6-ph*52;
-        }
-
-        // kamera: dolly + parallax + fov warp
-        camera.position.z=26-ease*15-wh*7;
-        camera.position.x=mx*3;
-        camera.position.y=-ease*2.2+my*2;
-        camera.lookAt(mx*4,my*2,-20);
-        var nf=62+warp*13;
-        if(Math.abs(camera.fov-nf)>.1){ camera.fov=nf; camera.updateProjectionMatrix(); }
-
-        renderer.render(scene,camera);
-        requestAnimationFrame(loop);
-      })();
-      return;
-    }catch(e){ /* jatuh ke fallback 2D */ }
+  function onScroll(){
+    var max=document.documentElement.scrollHeight-window.innerHeight;
+    targetJourney=max>0?window.scrollY/max:0;
+    if(useWorker && worker) worker.postMessage({type:'scroll', journey:targetJourney});
   }
 
-  /* --- fallback 2D canvas --- */
-  var x=canvas.getContext('2d'), W,H,s2=[],fmx=0,fmy=0,ftmx=0,ftmy=0,fsy=0;
-  var N2=window.innerWidth<640?130:260;
-  function rs(){ W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight; }
-  rs(); window.addEventListener('resize',rs);
-  for(var j=0;j<N2;j++) s2.push({x:Math.random(),y:Math.random(),z:Math.random()*.75+.25,
-    r:Math.random()*1.3+.3,tw:Math.random()*Math.PI*2,lime:Math.random()<.12});
-  window.addEventListener('mousemove',function(e){
-    ftmx=(e.clientX/window.innerWidth-.5); ftmy=(e.clientY/window.innerHeight-.5);
-  },{passive:true});
-  window.addEventListener('scroll',function(){ fsy=window.scrollY; },{passive:true});
-  (function loop2(t){
-    x.clearRect(0,0,W,H);
-    fmx+=(ftmx-fmx)*.045; fmy+=(ftmy-fmy)*.045;
-    for(var k=0;k<s2.length;k++){
-      var s=s2[k];
-      var px=(((s.x-fmx*s.z*.05-fsy*.000035*s.z)%1)+1)%1*W;
-      var py=(((s.y-fmy*s.z*.05)%1)+1)%1*H;
-      x.globalAlpha=(.22+.78*Math.abs(Math.sin(t*.0011+s.tw)))*s.z;
-      x.fillStyle=s.lime?'#C6F24E':'#ffffff';
-      x.beginPath(); x.arc(px,py,s.r*s.z,0,7); x.fill();
+  // Coba Web Worker + OffscreenCanvas
+  function initWorker(){
+    try{
+      if(!window.Worker || !canvas.transferControlToOffscreen) return false;
+      worker=new Worker('worker-3d.js');
+      var off=canvas.transferControlToOffscreen();
+      var ready=false;
+      worker.onmessage=function(e){
+        if(e.data.type==='ready'){ ready=true; }
+        else if(e.data.type==='error'){ initFallback(); }
+      };
+      worker.onerror=function(){ initFallback(); };
+      worker.postMessage({type:'init', canvas:off,
+        width:window.innerWidth, height:window.innerHeight,
+        dpr:window.devicePixelRatio||1, isMobile:isMobile}, [off]);
+      // Timeout: jika worker tidak ready dalam 5 detik, fallback
+      setTimeout(function(){ if(!ready) initFallback(); }, 5000);
+      useWorker=true;
+      // Worker aktif = satu-satunya renderer 3D. Matikan ray-tracer #bh (hemat GPU).
+      window.__worker3D=true;
+      var bhc=document.getElementById('bh');
+      if(bhc) bhc.style.display='none';
+      window.addEventListener('scroll', onScroll, {passive:true});
+      window.addEventListener('resize', function(){
+        if(worker) worker.postMessage({type:'resize', width:window.innerWidth, height:window.innerHeight});
+      });
+      document.addEventListener('visibilitychange', function(){
+        if(!worker) return;
+        worker.postMessage({type: document.hidden?'pause':'resume'});
+      });
+      return true;
+    }catch(e){ return false; }
+  }
+
+  // Fallback: render di main thread (kode 3D yang sudah ada)
+  function initFallback(){
+    if(worker){ try{worker.terminate();}catch(e){} worker=null; }
+    useWorker=false;
+    startMainThread();
+  }
+
+  function startMainThread(){
+    // (implementasi main-thread dipindah ke fungsi terpisah di bawah)
+    initMainThread3D(canvas, isMobile);
+  }
+
+  if(!initWorker()){
+    initFallback();
+  } else {
+    // Worker mode: tetap perlu scroll listener awal
+    onScroll();
+  }
+})();
+
+/* ---------- TEXT DIVE: hero text jatuh ke dalam black hole saat scroll ----------
+   progress 0→1 selama 85% viewport pertama:
+   scale 1→0.18, melayang ke pusat black hole (~42% viewport), fade + blur */
+(function(){
+  var wrap=document.querySelector('.hero .wrap');
+  var prompt=document.querySelector('.hero-scroll');
+  var divePrompt=document.querySelector('.dive-prompt');
+  if(!wrap) return;
+  var reduceM=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduceM) return;
+  var ticking=false;
+  function update(){
+    ticking=false;
+    var vh=window.innerHeight;
+    var p=Math.max(0,Math.min(1,window.scrollY/(vh*0.85)));
+    if(p<=0.001){
+      wrap.style.transform=''; wrap.style.opacity=''; wrap.style.filter='';
+    } else {
+      var e=p*p*(3-2*p); // smoothstep
+      var scale=1-e*0.82;
+      var dy=-e*vh*0.10;  // hanyut ke atas, menuju pusat black hole
+      wrap.style.transform='translateY('+dy.toFixed(1)+'px) scale('+scale.toFixed(3)+')';
+      wrap.style.opacity=String(Math.max(0,1-e*0.97));
+      wrap.style.filter=e>0.02?('blur('+(e*7).toFixed(1)+'px)'):'';
     }
-    x.globalAlpha=1;
-    requestAnimationFrame(loop2);
-  })(0);
+    var pp=Math.max(0,Math.min(1,window.scrollY/(vh*0.22)));
+    if(prompt) prompt.style.opacity=String(1-pp);
+    if(divePrompt) divePrompt.style.opacity=String(1-Math.max(0,Math.min(1,window.scrollY/(vh*0.3))));
+  }
+  window.addEventListener('scroll',function(){
+    if(!ticking){ ticking=true; requestAnimationFrame(update); }
+  },{passive:true});
+  update();
 })();
 
 /* ---------- Intro ---------- */
 (function(){
-  /* ===== BIG BANG: cosmic web ungu mekar ===== */
+  /* ===== BIG BANG: ledakan kosmik — flash inti + shockwave + burst partikel =====
+     Fase 1 (0–0.7s):   inti putih panas meledak, shockwave mengembang
+     Fase 2 (0.7–3.5s): partikel burst keluar dengan trail, warna mendingin
+                         putih → emas → ungu → biru, lalu merajut cosmic web */
   (function(){
     var bc=document.getElementById('bangCanvas');
     if(!bc) return;
@@ -492,40 +280,85 @@ if(dmStage){ var s=stages[0][1],h=stages[0][2];
     var reduceM=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     function bresize(){ BW=bc.width=window.innerWidth; BH=bc.height=window.innerHeight; }
     bresize(); window.addEventListener('resize',bresize);
-    var N=window.innerWidth<640?70:140;
+    var isMob=window.innerWidth<640;
+    var N=isMob?90:170;
     for(var i=0;i<N;i++){
-      var a=Math.random()*Math.PI*2, d=Math.random()*.3;
-      pts.push({a:a, d:d, sp:.4+Math.random()*.8, s:Math.random()*1.8+.4,
-        hue:270+Math.random()*40});
+      var a=Math.random()*Math.PI*2;
+      // kecepatan burst: cepat di awal, melambat (easing alami via pow)
+      pts.push({a:a, v:.55+Math.random()*1.15, s:Math.random()*2.2+.6,
+        hue:20+Math.random()*300, tw:Math.random()*6.28});
     }
     var bt0=performance.now();
+    var DUR=3500;
     (function bang(){
       var intro=document.getElementById('intro');
       if(!intro || intro.classList.contains('gone')) return;
-      var t=(performance.now()-bt0)/2600; // 2.6 detik mekar penuh
-      bctx.fillStyle='rgba(5,5,7,.12)';
+      var el=(performance.now()-bt0)/1000; // detik
+      var t=Math.min(1,el/(DUR/1000));
+      bctx.fillStyle='rgba(4,4,6,.16)';
       bctx.fillRect(0,0,BW,BH);
-      var cx=BW/2, cy=BH/2, maxR=Math.max(BW,BH)*.7;
+      var cx=BW/2, cy=BH/2, maxR=Math.max(BW,BH)*.75;
+
+      /* --- Fase 1: inti ledakan --- */
+      if(el<1.1){
+        var ft=el/1.1;
+        var coreR=(1-Math.pow(1-ft,3))*maxR*.28;
+        var coreA=Math.max(0,1-ft*1.15);
+        // inti putih panas
+        var g=bctx.createRadialGradient(cx,cy,0,cx,cy,Math.max(1,coreR));
+        g.addColorStop(0,'rgba(255,252,244,'+(.95*coreA+.05)+')');
+        g.addColorStop(.35,'rgba(255,214,150,'+(.75*coreA)+')');
+        g.addColorStop(1,'rgba(233,161,59,0)');
+        bctx.fillStyle=g;
+        bctx.beginPath(); bctx.arc(cx,cy,Math.max(1,coreR),0,7); bctx.fill();
+        // shockwave ring
+        var sw=(1-Math.pow(1-Math.min(1,ft*1.25),2))*maxR*.62;
+        bctx.strokeStyle='rgba(255,220,160,'+(.5*Math.max(0,1-ft))+')';
+        bctx.lineWidth=2.5*(1-ft)+.5;
+        bctx.beginPath(); bctx.arc(cx,cy,Math.max(1,sw),0,7); bctx.stroke();
+      }
+
+      /* --- Fase 2: burst partikel --- */
       for(var i=0;i<pts.length;i++){
         var p=pts[i];
-        var r=Math.min(1,t*p.sp+p.d)*maxR;
+        // easing keluar: cepat lalu melambat
+        var rt=1-Math.pow(1-Math.min(1,t*1.15),2.2);
+        var r=rt*p.v*maxR;
         var x=cx+Math.cos(p.a)*r, y=cy+Math.sin(p.a)*r;
-        // garis ke tetangga (cosmic web)
-        for(var j=i+1;j<Math.min(i+4,pts.length);j++){
-          var q=pts[j];
-          var r2=Math.min(1,t*q.sp+q.d)*maxR;
-          var x2=cx+Math.cos(q.a)*r2, y2=cy+Math.sin(q.a)*r2;
-          var dist=Math.hypot(x-x2,y-y2);
-          if(dist<maxR*.18){
-            bctx.strokeStyle='hsla('+p.hue+',70%,60%,'+(0.14*(1-dist/(maxR*.18)))+')';
-            bctx.lineWidth=.6;
-            bctx.beginPath(); bctx.moveTo(x,y); bctx.lineTo(x2,y2); bctx.stroke();
-          }
-        }
-        bctx.fillStyle='hsla('+p.hue+',80%,70%,'+Math.min(1,t*2)*.9+')';
+        // warna mendingin seiring waktu: putih → emas → ungu → biru
+        var hue, sat=85, lit=68;
+        if(t<.25){ hue=45; lit=88; }
+        else if(t<.5){ hue=30+p.hue*.1; lit=70; }
+        else { hue=265+((p.hue*37)%60); }
+        var alpha=Math.min(1,t*3)*Math.max(0,1-t*.55)*(.55+.45*Math.sin(el*4+p.tw));
+        // trail: garis pendek ke arah gerak
+        var tx=cx+Math.cos(p.a)*Math.max(0,r-14*p.v), ty=cy+Math.sin(p.a)*Math.max(0,r-14*p.v);
+        bctx.strokeStyle='hsla('+hue+','+sat+'%,'+lit+'%,'+(alpha*.5)+')';
+        bctx.lineWidth=p.s*.7;
+        bctx.beginPath(); bctx.moveTo(tx,ty); bctx.lineTo(x,y); bctx.stroke();
+        bctx.fillStyle='hsla('+hue+','+sat+'%,'+Math.min(95,lit+12)+'%,'+alpha+')';
         bctx.beginPath(); bctx.arc(x,y,p.s,0,7); bctx.fill();
       }
-      if(!reduceM) requestAnimationFrame(bang);
+
+      /* --- cosmic web: merajut setelah ledakan mereda --- */
+      if(t>.45){
+        var wt=(t-.45)/.55;
+        for(var i2=0;i2<pts.length;i2+=3){
+          var p1=pts[i2], p2=pts[i2+1];
+          if(!p2) break;
+          var r1=(1-Math.pow(1-Math.min(1,t*1.15),2.2))*p1.v*maxR;
+          var r2=(1-Math.pow(1-Math.min(1,t*1.15),2.2))*p2.v*maxR;
+          var x1=cx+Math.cos(p1.a)*r1, y1=cy+Math.sin(p1.a)*r1;
+          var x2=cx+Math.cos(p2.a)*r2, y2=cy+Math.sin(p2.a)*r2;
+          var dist=Math.hypot(x1-x2,y1-y2);
+          if(dist<maxR*.2){
+            bctx.strokeStyle='hsla(272,70%,62%,'+(wt*.13*(1-dist/(maxR*.2)))+')';
+            bctx.lineWidth=.6;
+            bctx.beginPath(); bctx.moveTo(x1,y1); bctx.lineTo(x2,y2); bctx.stroke();
+          }
+        }
+      }
+      if(!reduceM && t<1) requestAnimationFrame(bang);
     })();
   })();
 
@@ -713,8 +546,9 @@ if(!canvas) return;
 if(EMBED_MODE){ canvas.style.display='none'; return; } // demo iframe: tanpa ray-tracer
 var reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 var isMobile=window.innerWidth<640;
-var gl=canvas.getContext('webgl',{alpha:false,antialias:false,depth:false,stencil:false});
-if(!gl){ canvas.style.display='none'; return; }
+var gl=null;
+try{ gl=canvas.getContext('webgl',{alpha:false,antialias:false,depth:false,stencil:false}); }catch(e){}
+if(!gl){ return; } // biarkan CSS fallback (radial gradient) yang tampil
 
 var VS='attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
 var FS=[
@@ -780,11 +614,11 @@ var FS=[
 ].join('\n');
 
 function sh(type,src){var s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);
- if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){canvas.style.display='none';return null;}return s;}
+ if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){return null;}return s;}
 var vs=sh(gl.VERTEX_SHADER,VS),fs=sh(gl.FRAGMENT_SHADER,FS);
 if(!vs||!fs) return;
 var pr=gl.createProgram();gl.attachShader(pr,vs);gl.attachShader(pr,fs);gl.linkProgram(pr);
-if(!gl.getProgramParameter(pr,gl.LINK_STATUS)){canvas.style.display='none';return;}
+if(!gl.getProgramParameter(pr,gl.LINK_STATUS)){return;}
 gl.useProgram(pr);
 var buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
 gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
@@ -809,6 +643,8 @@ window.__bh=bhState;
 var t0=performance.now(),lastT=0;
 (function frame(){
   var now=performance.now(),t=(now-t0)*.001;
+  // Worker 3D aktif = ray-tracer tidak perlu render sama sekali
+  if(window.__worker3D){requestAnimationFrame(frame);return;}
   // hemat baterai: skip frame bila tab hidden atau bh sudah fade out
   var op=parseFloat(canvas.style.opacity||'1');
   if(document.hidden||op<=0.01){requestAnimationFrame(frame);return;}
@@ -921,7 +757,7 @@ var t0=performance.now(),lastT=0;
   function resize(){ W=cv.width=window.innerWidth; H=cv.height=window.innerHeight; }
   function initStreaks(){
     streaks=[];
-    var N=window.innerWidth<640?120:250;
+    var N=window.innerWidth<640?60:120;
     for(var i=0;i<N;i++){
       var a=Math.random()*Math.PI*2;
       var r=Math.max(W,H)*(.1+Math.random()*.4);
@@ -951,11 +787,8 @@ var t0=performance.now(),lastT=0;
       var x=cx+Math.cos(s.a)*s.r, y=cy+Math.sin(s.a)*s.r;
       var tail=s.len*(1+el*8);
       var x2=cx+Math.cos(s.a)*(s.r+tail), y2=cy+Math.sin(s.a)*(s.r+tail);
-      var grad=ctx.createLinearGradient(x,y,x2,y2);
-      grad.addColorStop(0,'rgba('+s.hue+',0)');
-      grad.addColorStop(1,'rgba('+s.hue+','+(.3+el*.7)+')');
-      ctx.strokeStyle=grad;
-      ctx.lineWidth=1+el*1.5;
+      ctx.strokeStyle='rgba('+s.hue+','+(.25+el*.65)+')';
+      ctx.lineWidth=1+el;
       ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x2,y2); ctx.stroke();
     }
     // flash putih di akhir
@@ -985,3 +818,33 @@ var t0=performance.now(),lastT=0;
   window.addEventListener('resize', resize);
 })();
 
+
+/* ---------- Cinematic scroll journey (ala referensi) ---------- */
+(function(){
+  var heroBg=document.querySelector('.hero .cine-bg img');
+  var hero=document.querySelector('.hero');
+  if(!heroBg||!hero) return;
+  var ticking=false;
+  // Matikan Ken Burns di hero (diganti scroll-driven)
+  heroBg.style.animation='none';
+  function update(){
+    var r=hero.getBoundingClientRect();
+    var vh=window.innerHeight;
+    // prog: 0 = hero penuh terlihat, 1 = hero sudah di-scroll habis
+    var prog=Math.max(0,Math.min(1,-r.top/vh));
+    // DIVE: gambar membesar seolah kita terbang masuk
+    var scale=1+prog*2.5;
+    // FADE: semakin dalam, semakin gelap (masuk lubang hitam)
+    var bright=1-prog*.85;
+    heroBg.style.transform='scale('+scale+')';
+    heroBg.style.filter='brightness('+bright+')';
+    // Teks hero fade out saat dive
+    var heroContent=hero.querySelector('.wrap');
+    if(heroContent) heroContent.style.opacity=Math.max(0,1-prog*2.5);
+    ticking=false;
+  }
+  window.addEventListener('scroll',function(){
+    if(!ticking){ requestAnimationFrame(update); ticking=true; }
+  },{passive:true});
+  update();
+})();
