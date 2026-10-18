@@ -251,7 +251,9 @@ function frame(t){
     // FOV punch: 62 → 105 → 62 (efek terowongan)
     camera.fov=baseFov+Math.sin(p2*Math.PI)*43;
     camera.updateProjectionMatrix();
-    bhGroup.scale.multiplyScalar(1.06);  // BH melahap layar
+    // BH melahap layar — skala deterministik (kontinu dari fase 1: 3.1 → 15.5)
+    var fs=3.1*(1+p2*4);
+    bhGroup.scale.set(fs,fs,fs);
     // star-stretch: bintang memanjang ke arah kamera
     stretchStars(p2);
     stars.visible=true;
