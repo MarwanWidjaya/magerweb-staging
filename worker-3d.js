@@ -33,95 +33,156 @@ function buildScene(canvas, W, H, DPR, mobile){
   /* ================= WORLD 0: BLACK HOLE (Gargantua) ================= */
   bhGroup=new THREE.Group();
 
-  // Event horizon — hitam pekat
+  // Event horizon — hitam pekat sempurna
   var bhSphere=new THREE.Mesh(
-    new THREE.SphereGeometry(3.2,48,48),
+    new THREE.SphereGeometry(3.2,64,64),
     new THREE.MeshBasicMaterial({color:0x000000})
   );
   bhGroup.add(bhSphere);
 
-  // Accretion disk — gradasi panas Gargantua: putih-biru (inner edge, paling panas)
-  // → emas → oranye tua (outer). Disk TIPIS horizontal seperti di film.
-  var diskGeo=new THREE.RingGeometry(3.7,9.6,128,12);
-  var posAttr=diskGeo.attributes.position;
-  var colors=new Float32Array(posAttr.count*3);
-  var cHot=new THREE.Color(0xf2f6ff), cMid=new THREE.Color(0xffc86e),
-      cOut=new THREE.Color(0x8a3410), tmpC=new THREE.Color();
-  for(var i=0;i<posAttr.count;i++){
-    var x=posAttr.getX(i), y=posAttr.getY(i);
-    var r=Math.sqrt(x*x+y*y);
-    var f=Math.max(0,Math.min(1,(r-3.7)/5.9));
-    if(f<.45) tmpC.copy(cHot).lerp(cMid,f/.45);
-    else tmpC.copy(cMid).lerp(cOut,(f-.45)/.55);
-    // Turbulensi lembut — variasi brightness organik, bukan noise acak
-    var turb=.82+.28*Math.sin(x*1.9+y*1.4)*Math.cos(y*2.1-x*1.1)
-                 +.1*Math.sin(x*4.7-y*3.3);
-    colors[i*3]=tmpC.r*turb; colors[i*3+1]=tmpC.g*turb; colors[i*3+2]=tmpC.b*turb;
-  }
-  diskGeo.setAttribute('color', new THREE.BufferAttribute(colors,3));
-  disk=new THREE.Mesh(diskGeo, new THREE.MeshBasicMaterial({
-    vertexColors:true, transparent:true, opacity:.96, side:THREE.DoubleSide
-  }));
-  disk.rotation.x=-Math.PI/2.14; // nyaris edge-on = disk tipis ala Gargantua
+  /* ============ ACCRETION DISK — custom shader ala Gargantua ============
+     Fitur:
+     - Gradasi akurat: putih-biru (inner, terpanas) → emas → oranye gelap (outer)
+     - Doppler beaming: sisi yang bergerak mendekati viewer LEBIH TERANG
+       (efek relativistik — ciri khas disk black hole di film)
+     - Turbulensi ANIMASI (time-based, bukan baked statis)
+     - Inner edge SANGAT TERANG (material yang jatuh, terpanas)
+     - Radial streaks (aliran akresi) */
+  var DISK_IN=3.55, DISK_OUT=9.8;
+  var diskUniforms={
+    uTime:{value:0},
+    uInnerR:{value:DISK_IN},
+    uOuterR:{value:DISK_OUT}
+  };
+  var diskMat=new THREE.ShaderMaterial({
+    uniforms:diskUniforms,
+    transparent:true,
+    side:THREE.DoubleSide,
+    depthWrite:false,
+    vertexShader:[
+      'varying vec2 vPolar;',
+      'uniform float uInnerR;',
+      'uniform float uOuterR;',
+      'void main(){',
+      '  vec3 pos=position;',
+      '  float r=length(pos.xy);',
+      '  float radial=clamp((r-uInnerR)/(uOuterR-uInnerR),0.0,1.0);',
+      '  float angular=atan(pos.y,pos.x)/6.2831853+0.5;',
+      '  vPolar=vec2(radial,angular);',
+      '  gl_Position=projectionMatrix*modelViewMatrix*vec4(pos,1.0);',
+      '}'
+    ].join('\n'),
+    fragmentShader:[
+      'varying vec2 vPolar;',
+      'uniform float uTime;',
+      'vec3 diskColor(float r){',
+      '  vec3 hot=vec3(0.96,0.98,1.0);',   // putih-biru: inner terpanas
+      '  vec3 mid=vec3(1.0,0.76,0.40);',    // emas
+      '  vec3 outc=vec3(0.50,0.19,0.05);',  // oranye gelap: outer terdingin
+      '  vec3 c=mix(hot,mid,smoothstep(0.0,0.42,r));',
+      '  c=mix(c,outc,smoothstep(0.42,1.0,r));',
+      '  return c;',
+      '}',
+      'void main(){',
+      '  float r=vPolar.x;',
+      '  float theta=vPolar.y*6.2831853;',
+      '  vec3 col=diskColor(r);',
+      // Doppler beaming: sisi kiri (mendekati viewer) lebih terang & kebiruan
+      '  float side=cos(theta);',
+      '  float beam=1.0+side*0.85;',
+      '  col*=beam;',
+      '  col.b+=max(0.0,side)*0.18*(1.0-r);',  // blue shift sisi terang
+      '  col.r+=max(0.0,-side)*0.10*(1.0-r);', // red shift sisi redup
+      // Inner edge menyala (material jatuh)
+      '  float innerGlow=pow(1.0-r,7.0)*2.2;',
+      '  col+=vec3(1.0,0.96,0.88)*innerGlow;',
+      // Turbulensi animasi — pusaran gas yang hidup
+      '  float turb=0.78',
+      '    +0.22*sin(theta*3.0+uTime*0.7+r*14.0)*cos(theta*5.0-uTime*0.45+r*9.0)',
+      '    +0.10*sin(theta*9.0+uTime*1.2+r*22.0);',
+      '  col*=turb;',
+      // Streaks radial — aliran akresi ke dalam
+      '  float streak=0.86+0.14*sin(theta*28.0+r*36.0-uTime*2.4);',
+      '  col*=streak;',
+      // Alpha: solid di dalam, fade di tepi luar
+      '  float alpha=0.97*(1.0-smoothstep(0.82,1.0,r));',
+      '  alpha*=0.88+0.12*turb;',
+      '  gl_FragColor=vec4(col,alpha);',
+      '}'
+    ].join('\n')
+  });
+  disk=new THREE.Mesh(new THREE.RingGeometry(DISK_IN,DISK_OUT,160,16), diskMat);
+  disk.rotation.x=-Math.PI/2.08; // nyaris edge-on = disk tipis ala Gargantua
   bhGroup.add(disk);
+  bhGroup.userData.diskUniforms=diskUniforms;
 
   // Inner glow — cincin terang di tepi event horizon
   glowInner=new THREE.Mesh(
     new THREE.RingGeometry(3.25,4.1,96),
-    new THREE.MeshBasicMaterial({color:0xffe9b8, transparent:true, opacity:.55,
+    new THREE.MeshBasicMaterial({color:0xffe9b8, transparent:true, opacity:.5,
       side:THREE.DoubleSide, blending:THREE.AdditiveBlending, depthWrite:false})
   );
-  glowInner.rotation.x=-Math.PI/2.14;
+  glowInner.rotation.x=-Math.PI/2.08;
   bhGroup.add(glowInner);
 
   // Outer halo — lembut, hangat
   glowOuter=new THREE.Mesh(
     new THREE.RingGeometry(3.4,10.5,96),
-    new THREE.MeshBasicMaterial({color:0xd98a3a, transparent:true, opacity:.16,
+    new THREE.MeshBasicMaterial({color:0xd98a3a, transparent:true, opacity:.14,
       side:THREE.DoubleSide, blending:THREE.AdditiveBlending, depthWrite:false})
   );
-  glowOuter.rotation.x=-Math.PI/2.25;
+  glowOuter.rotation.x=-Math.PI/2.2;
   bhGroup.add(glowOuter);
-
-  // Lensing arc — cahaya yang dibengkokkan di atas horizon (Einstein ring fragment)
-  arc=new THREE.Mesh(
-    new THREE.TorusGeometry(4.9,.3,14,96,Math.PI),
-    new THREE.MeshBasicMaterial({color:0xffd890, transparent:true, opacity:.55,
-      blending:THREE.AdditiveBlending, depthWrite:false})
-  );
-  arc.position.y=1.35;
-  bhGroup.add(arc);
 
   /* --- GARGANTUA LENSING: sisi jauh disk yang dibengkokkan gravitasi ---
      Ciri khas Interstellar: disk edge-on, tapi cahaya dari SISI JAUH disk
      (di belakang black hole) tertekuk ke ATAS — terlihat sebagai busur
-     terang melengkung di atas event horizon. Sisi bawah lebih redup. */
-  // Photon ring — cahaya yang mengorbit TEPAT di tepi event horizon (tipis, menyilaukan)
+     terang melengkung di atas event horizon. Sisi bawah lebih redup.
+     Dibuat dengan vertex-color gradient: terang di tengah busur,
+     meredup ke ujung — seperti cahaya yang dibengkokkan. */
+  function lensedArc(radius, tube, yPos, colorHot, colorDim, opacity, flip){
+    var geo=new THREE.TorusGeometry(radius,tube,20,160,Math.PI);
+    // Gradient sepanjang busur: terang di tengah, redup di ujung
+    var p=geo.attributes.position, n=p.count;
+    var cols=new Float32Array(n*3);
+    var cH=new THREE.Color(colorHot), cD=new THREE.Color(colorDim), tc=new THREE.Color();
+    for(var i=0;i<n;i++){
+      // Torus arc: parameter u sepanjang arc. Estimasi dari sudut.
+      var x=p.getX(i);
+      // Tengah busur (x≈0) paling terang
+      var f=Math.max(0,1-Math.abs(x)/(radius*1.05));
+      f=Math.pow(f,1.6);
+      tc.copy(cD).lerp(cH,f);
+      cols[i*3]=tc.r; cols[i*3+1]=tc.g; cols[i*3+2]=tc.b;
+    }
+    geo.setAttribute('color',new THREE.BufferAttribute(cols,3));
+    var m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({
+      vertexColors:true, transparent:true, opacity:opacity,
+      blending:THREE.AdditiveBlending, depthWrite:false}));
+    if(flip) m.rotation.z=Math.PI;
+    m.position.y=yPos;
+    return m;
+  }
+
+  // Lensing arc lama (dipertahankan, diselaraskan)
+  arc=lensedArc(4.9,.30,1.35,0xffe0a0,0x8a4a18,.5,false);
+  bhGroup.add(arc);
+
+  // Photon ring — SANGAT TIPIS, MENYILAUKAN, tepat di tepi event horizon
   photonRing=new THREE.Mesh(
-    new THREE.RingGeometry(3.3,3.52,128),
-    new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:.85,
+    new THREE.RingGeometry(3.28,3.42,160),
+    new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:.95,
       side:THREE.DoubleSide, blending:THREE.AdditiveBlending, depthWrite:false})
   );
-  photonRing.rotation.x=-Math.PI/2.14;
+  photonRing.rotation.x=-Math.PI/2.08;
   bhGroup.add(photonRing);
 
   // Upper lensed disk — busur TERANG di atas: sisi jauh disk tertekuk gravitasi
-  lensUp=new THREE.Mesh(
-    new THREE.TorusGeometry(5.7,.62,16,128,Math.PI),
-    new THREE.MeshBasicMaterial({color:0xffe2a8, transparent:true, opacity:.78,
-      blending:THREE.AdditiveBlending, depthWrite:false})
-  );
-  lensUp.position.y=2.35;
+  lensUp=lensedArc(5.7,.62,2.35,0xfff0c8,0xa06828,.85,false);
   bhGroup.add(lensUp);
 
   // Lower lensed disk — busur REDUP di bawah
-  lensDown=new THREE.Mesh(
-    new THREE.TorusGeometry(5.4,.42,16,128,Math.PI),
-    new THREE.MeshBasicMaterial({color:0xc97a30, transparent:true, opacity:.32,
-      blending:THREE.AdditiveBlending, depthWrite:false})
-  );
-  lensDown.rotation.z=Math.PI; // arc menghadap bawah
-  lensDown.position.y=-1.9;
+  lensDown=lensedArc(5.4,.42,-1.9,0xd88a3a,0x5a2a10,.35,true);
   bhGroup.add(lensDown);
 
   // Back glow — popler di belakang BH agar silhouette tegas
@@ -321,7 +382,9 @@ function frame(t){
     var breathe=1+Math.sin(time*.8)*.015;
     bhGroup.scale.set(s*breathe,s*breathe,s*breathe);
     bhGroup.visible=true;
-    disk.rotation.z=time*.12;     // rotasi disk pelan & anggun
+    // Shader disk: update waktu (turbulensi animasi, doppler tetap di satu sisi)
+    var du=bhGroup.userData.diskUniforms;
+    if(du) du.uTime.value=time;
     glowInner.rotation.z=-time*.05;
     arc.material.opacity=.4+Math.sin(time*.6)*.12;
     // Lensing arcs berdenyut halus — hidup seperti Gargantua di film
