@@ -143,6 +143,9 @@ function initMainThread3D(canvas, isMobile){
         var p=j/.30, e=p*p*(3-2*p);
         camera.position.set(0,0,30-e*26); camera.lookAt(0,.4,0);
         var s=(1+e*2.1)*(1+Math.sin(time*.8)*.015); bh.scale.set(s,s,s);
+        /* fallback: BH di sepertiga kanan */
+        var fhw=Math.tan(62*Math.PI/360)*(30-e*26)*camera.aspect;
+        bh.position.set(fhw*(0.42-e*0.24),1.2-e*0.6,0);
         bh.visible=true; tess.visible=false; stars.visible=true;
         disk.rotation.z=time*.12;
       } else if(j<.44){
@@ -232,6 +235,40 @@ function initMainThread3D(canvas, isMobile){
   }
 })();
 
+/* ---------- DEPTH METER: angka 000→997 ala poggufanz ---------- */
+(function(){
+  var num=document.getElementById('dmNum'),
+      fill=document.getElementById('dmFill'),
+      marker=document.getElementById('dmMarker'),
+      stage=document.getElementById('dmStage');
+  if(!num) return;
+  var ticking=false;
+  var STAGES=[
+    [0.00,'CH.00 · THE VOID'],[0.12,'CH.01 · THE PROBLEM'],
+    [0.24,'CH.02 · THE ANSWER'],[0.36,'CH.03 · TESSERACT'],
+    [0.58,'CH.04 · SERVICES'],[0.74,'CH.05 · ORIGIN'],
+    [0.90,'CH.05 · TRANSMISSION']
+  ];
+  function update(){
+    ticking=false;
+    var max=document.documentElement.scrollHeight-window.innerHeight;
+    var j=max>0?window.scrollY/max:0;
+    /* angka depth 000→997 */
+    num.textContent=String(Math.round(j*997)).padStart(3,'0');
+    if(fill) fill.style.height=(j*100).toFixed(1)+'%';
+    if(marker) marker.style.top=(j*100).toFixed(1)+'%';
+    if(stage){
+      var s=STAGES[0][1];
+      for(var i=0;i<STAGES.length;i++){ if(j>=STAGES[i][0]) s=STAGES[i][1]; }
+      if(stage.textContent!==s) stage.textContent=s;
+    }
+  }
+  window.addEventListener('scroll',function(){
+    if(!ticking){ ticking=true; requestAnimationFrame(update); }
+  },{passive:true});
+  update();
+})();
+
 /* ---------- TEXT DIVE: hero text jatuh ke dalam black hole saat scroll ----------
    progress 0→1 selama 100% viewport pertama (LEBIH PANJANG):
    scale 1→0.08 (LEBIH EKSTREM), melayang ke pusat black hole, fade + blur 14px */
@@ -253,7 +290,8 @@ function initMainThread3D(canvas, isMobile){
       var e=p*p*(3-2*p); // smoothstep
       var scale=1-e*0.92;  // 1 → 0.08 (jauh lebih ekstrem)
       var dy=-e*vh*0.18;  // hanyut lebih jauh ke atas, menuju pusat black hole
-      wrap.style.transform='translateY('+dy.toFixed(1)+'px) scale('+scale.toFixed(3)+')';
+      var dx=e*window.innerWidth*0.16; // hanyut ke KANAN — black hole di sepertiga kanan
+      wrap.style.transform='translate('+dx.toFixed(1)+'px,'+dy.toFixed(1)+'px) scale('+scale.toFixed(3)+')';
       wrap.style.opacity=String(Math.max(0,1-e*0.99));
       wrap.style.filter=e>0.02?('blur('+(e*14).toFixed(1)+'px)'):'';
     }
@@ -379,11 +417,14 @@ function initMainThread3D(canvas, isMobile){
 
   var intro=document.getElementById('intro');
   if(!intro) return;
+  /* poggufanz-match: nav terlihat redup selama intro */
+  document.body.classList.add('loading');
   var num=document.getElementById('introNum'),
       bar=document.getElementById('introBar'), p=0, done=false;
   function finish(){
     if(done) return; done=true;
     intro.classList.add('gone');
+    document.body.classList.remove('loading');
     var heroRvs=document.querySelectorAll('.hero .rv');
     for(var i=0;i<heroRvs.length;i++){
       (function(el,j){ setTimeout(function(){ el.classList.add('in'); },160+j*130); })(heroRvs[i],i);
@@ -492,59 +533,49 @@ function initMainThread3D(canvas, isMobile){
 })();
 
 
-/* ---------- Room slider (horizontal) ---------- */
+/* ---------- SCROLL ROOMS: satu room per waktu, ganti via scroll vertikal (ala poggufanz) ---------- */
 (function(){
-  var track=document.querySelector('.slider-track');
-  if(!track) return;
-  var rooms=track.querySelectorAll('.room');
-  var dotsBox=document.querySelector('.slider-dots');
-  var prev=document.querySelector('.slider-prev'), next=document.querySelector('.slider-next');
-  var dots=[];
-  rooms.forEach(function(_,i){
-    var d=document.createElement('button');
-    d.setAttribute('aria-label','Ke karya '+(i+1));
-    d.addEventListener('click',function(){ goTo(i); });
-    dotsBox.appendChild(d); dots.push(d);
-  });
-  function cur(){
-    var w=rooms[0].offsetWidth+24;
-    return Math.max(0,Math.min(rooms.length-1,Math.round(track.scrollLeft/w)));
-  }
-  function goTo(i){
-    i=Math.max(0,Math.min(rooms.length-1,i));
-    track.scrollTo({left:i*(rooms[0].offsetWidth+24),behavior:'smooth'});
-  }
+  var scroller=document.getElementById('roomsScroll');
+  if(!scroller) return;
+  var rooms=scroller.querySelectorAll('.sroom');
+  var cur2=document.getElementById('roomCur');
+  var tl=scroller.querySelector('.rooms-timeline i');
+  if(!rooms.length) return;
+  var cur=-1, ticking=false;
   function paint(){
-    var c=cur();
-    dots.forEach(function(d,i){ d.classList.toggle('on',i===c); });
-    var rc=document.getElementById('roomCur');
-    if(rc) rc.textContent=String(c+1).padStart(2,'0');
-    if(prev) prev.style.opacity=c===0?.35:1;
-    if(next) next.style.opacity=c===rooms.length-1?.35:1;
+    ticking=false;
+    var r=scroller.getBoundingClientRect(), vh=window.innerHeight;
+    var total=r.height-vh;
+    var prog=total>0?Math.max(0,Math.min(1,-r.top/total)):0;
+    var i=Math.max(0,Math.min(rooms.length-1,Math.floor(prog*rooms.length)));
+    /* beri sedikit hysteresis di batas agar tidak flicker */
+    if(i!==cur){
+      if(cur>=0) rooms[cur].classList.remove('on');
+      rooms[i].classList.add('on');
+      cur=i;
+      if(cur2) cur2.textContent=String(i+1).padStart(2,'0');
+    }
+    if(tl) tl.style.setProperty('--rp',(prog).toFixed(3));
   }
-  if(prev) prev.addEventListener('click',function(){ goTo(cur()-1); });
-  if(next) next.addEventListener('click',function(){ goTo(cur()+1); });
-  var st; track.addEventListener('scroll',function(){
-    clearTimeout(st); st=setTimeout(paint,80);
+  window.addEventListener('scroll',function(){
+    if(!ticking){ ticking=true; requestAnimationFrame(paint); }
   },{passive:true});
-  /* drag to scroll */
-  var down=false,sx=0,sl=0;
-  track.addEventListener('pointerdown',function(e){
-    down=true; sx=e.clientX; sl=track.scrollLeft; track.classList.add('dragging');
-  });
-  window.addEventListener('pointermove',function(e){
-    if(!down) return; track.scrollLeft=sl-(e.clientX-sx);
-  });
-  window.addEventListener('pointerup',function(){
-    down=false; track.classList.remove('dragging'); paint();
-  });
-  /* keyboard */
-  track.setAttribute('tabindex','0');
-  track.addEventListener('keydown',function(e){
-    if(e.key==='ArrowRight') goTo(cur()+1);
-    if(e.key==='ArrowLeft') goTo(cur()-1);
-  });
+  window.addEventListener('resize',paint);
   paint();
+  /* ENTER ROOM: buka demo panel dengan URL room */
+  scroller.querySelectorAll('.sroom-enter').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var room=btn.closest('.sroom');
+      var url=room&&room.dataset.url;
+      var d=document.getElementById('tessDemo');
+      var lf=document.getElementById('tdFrame');
+      if(!d||!url) return;
+      if(lf) lf.src=url;
+      d.classList.add('on'); d.setAttribute('aria-hidden','false');
+      document.documentElement.style.overflow='hidden';
+      document.body.style.overflow='hidden';
+    });
+  });
 })();
 
 })();
