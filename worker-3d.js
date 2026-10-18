@@ -39,16 +39,17 @@ function buildScene(canvas, W, H, DPR, mobile){
   );
   bhGroup.add(bhSphere);
 
-  // Accretion disk — gradasi panas: putih-kuning (dalam) → emas → oranye tua (luar)
-  var diskGeo=new THREE.RingGeometry(3.7,8.6,96,10);
+  // Accretion disk — gradasi panas Gargantua: putih-biru (inner edge, paling panas)
+  // → emas → oranye tua (outer). Disk TIPIS horizontal seperti di film.
+  var diskGeo=new THREE.RingGeometry(3.7,9.6,128,12);
   var posAttr=diskGeo.attributes.position;
   var colors=new Float32Array(posAttr.count*3);
-  var cHot=new THREE.Color(0xfff6dd), cMid=new THREE.Color(0xf5b545),
-      cOut=new THREE.Color(0x7a2f0c), tmpC=new THREE.Color();
+  var cHot=new THREE.Color(0xf2f6ff), cMid=new THREE.Color(0xffc86e),
+      cOut=new THREE.Color(0x8a3410), tmpC=new THREE.Color();
   for(var i=0;i<posAttr.count;i++){
     var x=posAttr.getX(i), y=posAttr.getY(i);
     var r=Math.sqrt(x*x+y*y);
-    var f=Math.max(0,Math.min(1,(r-3.7)/4.9));
+    var f=Math.max(0,Math.min(1,(r-3.7)/5.9));
     if(f<.45) tmpC.copy(cHot).lerp(cMid,f/.45);
     else tmpC.copy(cMid).lerp(cOut,(f-.45)/.55);
     // Turbulensi lembut — variasi brightness organik, bukan noise acak
@@ -60,7 +61,7 @@ function buildScene(canvas, W, H, DPR, mobile){
   disk=new THREE.Mesh(diskGeo, new THREE.MeshBasicMaterial({
     vertexColors:true, transparent:true, opacity:.96, side:THREE.DoubleSide
   }));
-  disk.rotation.x=-Math.PI/2.25;
+  disk.rotation.x=-Math.PI/2.14; // nyaris edge-on = disk tipis ala Gargantua
   bhGroup.add(disk);
 
   // Inner glow — cincin terang di tepi event horizon
@@ -69,7 +70,7 @@ function buildScene(canvas, W, H, DPR, mobile){
     new THREE.MeshBasicMaterial({color:0xffe9b8, transparent:true, opacity:.55,
       side:THREE.DoubleSide, blending:THREE.AdditiveBlending, depthWrite:false})
   );
-  glowInner.rotation.x=-Math.PI/2.25;
+  glowInner.rotation.x=-Math.PI/2.14;
   bhGroup.add(glowInner);
 
   // Outer halo — lembut, hangat
@@ -104,16 +105,23 @@ function buildScene(canvas, W, H, DPR, mobile){
   /* ================= WORLD 2: TESSERACT (Cooper) ================= */
   tessGroup=new THREE.Group();
 
-  // Pencahayaan hangat kayu — megah, bukan muram
-  tessGroup.add(new THREE.AmbientLight(0x9a7a55,1.05));
-  var key=new THREE.DirectionalLight(0xffd9a0,1.5);
+  // Pencahayaan DRAMATIS ala Interstellar — hangat kayu, megah, dalam
+  // Ambient lebih rendah = kontras lebih kuat, sorotan lebih teatrikal
+  tessGroup.add(new THREE.AmbientLight(0x8a6a48,0.85));
+  var key=new THREE.DirectionalLight(0xffd9a0,1.8);
   key.position.set(12,18,8); tessGroup.add(key);
-  var warmA=new THREE.PointLight(0xff9a50,2.0,140);
+  // Sorotan hangat berlapis — kedalaman lorong berasa
+  var warmA=new THREE.PointLight(0xff9a50,2.4,150);
   warmA.position.set(-10,4,-220); tessGroup.add(warmA);
-  var warmB=new THREE.PointLight(0xffb060,1.6,140);
+  var warmB=new THREE.PointLight(0xffb060,2.0,150);
   warmB.position.set(10,-4,-320); tessGroup.add(warmB);
-  var coolRim=new THREE.PointLight(0x5a7aff,.5,120);
-  coolRim.position.set(0,10,-420); tessGroup.add(coolRim);
+  var warmC=new THREE.PointLight(0xff8a30,1.4,130);
+  warmC.position.set(0,6,-420); tessGroup.add(warmC);
+  var coolRim=new THREE.PointLight(0x5a7aff,.6,130);
+  coolRim.position.set(0,10,-480); tessGroup.add(coolRim);
+  // Cahaya "ilahi" dari ujung lorong — tujuan perjalanan Cooper
+  var divine=new THREE.PointLight(0xffc080,1.2,200);
+  divine.position.set(0,0,-600); tessGroup.add(divine);
 
   // Lorong rak buku: dari z=-190 sampai z=-620, rak di kiri/kanan/atas/bawah.
   // Tengah lorong KOSONG (jalur kamera) — Cooper terbang di tengah tesseract.
@@ -181,11 +189,29 @@ function buildScene(canvas, W, H, DPR, mobile){
   // Cahaya hangat di ujung lorong — "tujuan" perjalanan
   var destGlow=new THREE.Mesh(
     new THREE.CircleGeometry(26,32),
-    new THREE.MeshBasicMaterial({color:0xff9a40, transparent:true, opacity:.28,
+    new THREE.MeshBasicMaterial({color:0xff9a40, transparent:true, opacity:.32,
       blending:THREE.AdditiveBlending, depthWrite:false})
   );
   destGlow.position.set(0,0,-640);
   tessGroup.add(destGlow);
+
+  // Debu melayang — atmosfer sinematik ala Interstellar (cahaya menembus debu)
+  var DUST_N=isMobile?120:300;
+  var dustPos=new Float32Array(DUST_N*3);
+  for(var di=0;di<DUST_N;di++){
+    dustPos[di*3]=(Math.random()-.5)*16;
+    dustPos[di*3+1]=(Math.random()-.5)*16;
+    dustPos[di*3+2]=-180-Math.random()*440;
+  }
+  var dustGeo=new THREE.BufferGeometry();
+  dustGeo.setAttribute('position',new THREE.BufferAttribute(dustPos,3));
+  var dust=new THREE.Points(dustGeo,new THREE.PointsMaterial({
+    color:0xffd9a0,size:.35,transparent:true,opacity:.5,
+    blending:THREE.AdditiveBlending,depthWrite:false}));
+  dust.userData.base=dustPos.slice();
+  tessGroup.add(dust);
+  tessGroup.userData.dust=dust;
+  tessGroup.userData.dustN=DUST_N;
 
   tessGroup.visible=false;
   scene.add(tessGroup);
@@ -219,7 +245,18 @@ function buildScene(canvas, W, H, DPR, mobile){
 function frame(t){
   if(!running) return;
   rafId=requestAnimationFrame(frame);
-  journey+=(targetJourney-journey)*.08;
+  // Butter-smooth: lerp adaptif — lebih lambat di dekat batas fase (transisi mulus),
+  // lebih cepat di tengah fase (responsif). Menghindari "patah" antar fase.
+  var dj=Math.abs(targetJourney-journey);
+  var distToEdge=Math.min(
+    Math.abs(journey-.30), Math.abs(journey-.44)
+  );
+  // melambat dalam radius 0.06 dari batas fase
+  var slowF=distToEdge<.06 ? .35+.65*(distToEdge/.06) : 1;
+  var lerpF=Math.min(.12,.03+dj*.25)*slowF+.02*slowF;
+  journey+=(targetJourney-journey)*Math.max(.015,lerpF);
+  // snap halus saat sangat dekat (hindari jitter abadi)
+  if(Math.abs(targetJourney-journey)<.0004) journey=targetJourney;
   var j=journey, time=t*.001;
 
   if(j<.30){
@@ -274,6 +311,19 @@ function frame(t){
     stars.visible=false;
     flashPlane.visible=false;
     tessGroup.visible=true;
+    // Debu melayang lembut — hidup, sinematik
+    var dust=tessGroup.userData.dust;
+    if(dust){
+      var dp=dust.geometry.attributes.position.array;
+      var db=dust.userData.base;
+      var dn=tessGroup.userData.dustN;
+      for(var ddi=0;ddi<dn;ddi++){
+        dp[ddi*3]=db[ddi*3]+Math.sin(time*.3+ddi*1.7)*.8;
+        dp[ddi*3+1]=db[ddi*3+1]+Math.cos(time*.22+ddi*2.3)*.8;
+      }
+      dust.geometry.attributes.position.needsUpdate=true;
+      dust.material.opacity=.4+Math.sin(time*.5)*.12;
+    }
     // Cahaya ujung berdenyut lembut — menuntun mata ke depan
     // (destGlow adalah child terakhir tessGroup sebelum stars? akses via userData)
   }
