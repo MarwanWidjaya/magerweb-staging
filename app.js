@@ -149,7 +149,7 @@ function initMainThread3D(canvas, isMobile){
         var p2=(j-.30)/.14;
         camera.position.set(0,.3,4-p2*10); camera.lookAt(0,.4,-20);
         camera.fov=62+Math.sin(p2*Math.PI)*43; camera.updateProjectionMatrix();
-        bh.scale.multiplyScalar(1.06); stars.visible=true;
+        var ffs=3.1*(1+p2*4); bh.scale.set(ffs,ffs,ffs); stars.visible=true;
       } else {
         var p3=(j-.44)/.56;
         camera.position.set(0,Math.sin(time*.25)*.12,-172-p3*380);
