@@ -100,6 +100,15 @@ function buildScene(canvas, W, H, DPR, mobile){
   backGlow.position.z=-2;
   bhGroup.add(backGlow);
 
+  // Orbit ring — bingkai orbit lingkaran abu-abu SANGAT BESAR ala poggufanz
+  var orbitRing=new THREE.Mesh(
+    new THREE.RingGeometry(11.9,12.12,128),
+    new THREE.MeshBasicMaterial({color:0x9a9aa5, transparent:true, opacity:.30,
+      side:THREE.DoubleSide, depthWrite:false})
+  );
+  bhGroup.add(orbitRing);
+  bhGroup.userData.orbit=orbitRing;
+
   scene.add(bhGroup);
 
   /* ================= WORLD 2: TESSERACT (Cooper) ================= */
@@ -260,7 +269,9 @@ function frame(t){
   var j=journey, time=t*.001;
 
   if(j<.30){
-    /* ---- BLACK HOLE: kamera mendekat, BH membesar & mendominasi ---- */
+    /* ---- BLACK HOLE: kamera mendekat, BH membesar & mendominasi ----
+       Posisi ala poggufanz: sepertiga KANAN, agak ke atas.
+       Saat kamera mendekat, BH bergeser ke tengah-kanan (jatuh ke singularitas). */
     var p=j/.30;
     // ease-in: mulai jauh, lalu "jatuh" mendekat
     var e=p*p*(3-2*p);
@@ -268,6 +279,10 @@ function frame(t){
     camera.position.set(Math.sin(time*.12)*.6, Math.cos(time*.09)*.5, camZ);
     camera.lookAt(0,.4,0);
     camera.fov=baseFov; camera.updateProjectionMatrix();
+    // offset kanan: proporsional terhadap lebar pandang agar konsisten di HP & desktop
+    var halfW=Math.tan(baseFov*Math.PI/360)*camZ*camera.aspect;
+    var fx=0.42-e*0.24;           // 0.42 (kanan) → 0.18 (tengah-kanan)
+    bhGroup.position.set(halfW*fx, 1.2-e*0.6, 0);  // agak ke atas, turun perlahan
     var s=1+e*2.1;                // BH membesar 3x lipat
     // "bernapas": pulsasi halus ±1.5%
     var breathe=1+Math.sin(time*.8)*.015;
@@ -283,8 +298,9 @@ function frame(t){
   } else if(j<.44){
     /* ---- THE FALL: warp ke singularitas ---- */
     var p2=(j-.30)/.14;           // 0..1
-    camera.position.set(0,.3,4-p2*10);  // menembus horizon
-    camera.lookAt(0,.4,-20);
+    var bhXc=bhGroup.position.x;
+    camera.position.set(bhXc*p2*.85,.3,4-p2*10);  // menembus horizon, melengkung ke arah BH
+    camera.lookAt(bhXc*.7,.4,-20);
     // FOV punch: 62 → 105 → 62 (efek terowongan)
     camera.fov=baseFov+Math.sin(p2*Math.PI)*43;
     camera.updateProjectionMatrix();
