@@ -14,6 +14,7 @@ importScripts('https://unpkg.com/three@0.160.0/build/three.min.js');
 
 var renderer=null, scene=null, camera=null;
 var bhGroup=null, disk=null, glowInner=null, glowOuter=null, arc=null;
+var lensUp=null, lensDown=null, photonRing=null;
 var tessGroup=null, flashPlane=null;
 var stars=null, starPos=null, starBase=null, STAR_N=0;
 var journey=0, targetJourney=0;
@@ -90,6 +91,38 @@ function buildScene(canvas, W, H, DPR, mobile){
   );
   arc.position.y=1.35;
   bhGroup.add(arc);
+
+  /* --- GARGANTUA LENSING: sisi jauh disk yang dibengkokkan gravitasi ---
+     Ciri khas Interstellar: disk edge-on, tapi cahaya dari SISI JAUH disk
+     (di belakang black hole) tertekuk ke ATAS — terlihat sebagai busur
+     terang melengkung di atas event horizon. Sisi bawah lebih redup. */
+  // Photon ring — cahaya yang mengorbit TEPAT di tepi event horizon (tipis, menyilaukan)
+  photonRing=new THREE.Mesh(
+    new THREE.RingGeometry(3.3,3.52,128),
+    new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:.85,
+      side:THREE.DoubleSide, blending:THREE.AdditiveBlending, depthWrite:false})
+  );
+  photonRing.rotation.x=-Math.PI/2.14;
+  bhGroup.add(photonRing);
+
+  // Upper lensed disk — busur TERANG di atas: sisi jauh disk tertekuk gravitasi
+  lensUp=new THREE.Mesh(
+    new THREE.TorusGeometry(5.7,.62,16,128,Math.PI),
+    new THREE.MeshBasicMaterial({color:0xffe2a8, transparent:true, opacity:.78,
+      blending:THREE.AdditiveBlending, depthWrite:false})
+  );
+  lensUp.position.y=2.35;
+  bhGroup.add(lensUp);
+
+  // Lower lensed disk — busur REDUP di bawah
+  lensDown=new THREE.Mesh(
+    new THREE.TorusGeometry(5.4,.42,16,128,Math.PI),
+    new THREE.MeshBasicMaterial({color:0xc97a30, transparent:true, opacity:.32,
+      blending:THREE.AdditiveBlending, depthWrite:false})
+  );
+  lensDown.rotation.z=Math.PI; // arc menghadap bawah
+  lensDown.position.y=-1.9;
+  bhGroup.add(lensDown);
 
   // Back glow — popler di belakang BH agar silhouette tegas
   var backGlow=new THREE.Mesh(
@@ -291,6 +324,10 @@ function frame(t){
     disk.rotation.z=time*.12;     // rotasi disk pelan & anggun
     glowInner.rotation.z=-time*.05;
     arc.material.opacity=.4+Math.sin(time*.6)*.12;
+    // Lensing arcs berdenyut halus — hidup seperti Gargantua di film
+    if(lensUp) lensUp.material.opacity=.66+Math.sin(time*.55)*.12;
+    if(lensDown) lensDown.material.opacity=.26+Math.sin(time*.55+1.2)*.07;
+    if(photonRing) photonRing.material.opacity=.75+Math.sin(time*1.1)*.1;
     tessGroup.visible=false;
     stars.visible=true;
     resetStars();
