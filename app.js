@@ -244,10 +244,11 @@ function initMainThread3D(canvas, isMobile){
   if(!num) return;
   var ticking=false;
   var STAGES=[
-    [0.00,'CH.00 · THE VOID'],[0.12,'CH.01 · THE PROBLEM'],
-    [0.24,'CH.02 · THE ANSWER'],[0.36,'CH.03 · TESSERACT'],
-    [0.58,'CH.04 · SERVICES'],[0.74,'CH.05 · ORIGIN'],
-    [0.90,'CH.05 · TRANSMISSION']
+    [0.00,'CH.00 · THE VOID'],[0.10,'CH.01 · THE PROBLEM'],
+    [0.20,'CH.02 · TRANSFORMATION'],[0.30,'CH.03 · TESSERACT'],
+    [0.48,'CH.04 · CASE STUDY'],[0.58,'CH.05 · SERVICES'],
+    [0.70,'CH.06 · PROSES'],[0.80,'CH.07 · ORIGIN'],
+    [0.89,'CH.08 · FAQ'],[0.96,'CH.09 · MULAI']
   ];
   function update(){
     ticking=false;
