@@ -233,8 +233,8 @@ function initMainThread3D(canvas, isMobile){
 })();
 
 /* ---------- TEXT DIVE: hero text jatuh ke dalam black hole saat scroll ----------
-   progress 0→1 selama 85% viewport pertama:
-   scale 1→0.18, melayang ke pusat black hole (~42% viewport), fade + blur */
+   progress 0→1 selama 100% viewport pertama (LEBIH PANJANG):
+   scale 1→0.08 (LEBIH EKSTREM), melayang ke pusat black hole, fade + blur 14px */
 (function(){
   var wrap=document.querySelector('.hero .wrap');
   var prompt=document.querySelector('.hero-scroll');
@@ -246,16 +246,16 @@ function initMainThread3D(canvas, isMobile){
   function update(){
     ticking=false;
     var vh=window.innerHeight;
-    var p=Math.max(0,Math.min(1,window.scrollY/(vh*0.85)));
+    var p=Math.max(0,Math.min(1,window.scrollY/(vh*1.0)));
     if(p<=0.001){
       wrap.style.transform=''; wrap.style.opacity=''; wrap.style.filter='';
     } else {
       var e=p*p*(3-2*p); // smoothstep
-      var scale=1-e*0.82;
-      var dy=-e*vh*0.10;  // hanyut ke atas, menuju pusat black hole
+      var scale=1-e*0.92;  // 1 → 0.08 (jauh lebih ekstrem)
+      var dy=-e*vh*0.18;  // hanyut lebih jauh ke atas, menuju pusat black hole
       wrap.style.transform='translateY('+dy.toFixed(1)+'px) scale('+scale.toFixed(3)+')';
-      wrap.style.opacity=String(Math.max(0,1-e*0.97));
-      wrap.style.filter=e>0.02?('blur('+(e*7).toFixed(1)+'px)'):'';
+      wrap.style.opacity=String(Math.max(0,1-e*0.99));
+      wrap.style.filter=e>0.02?('blur('+(e*14).toFixed(1)+'px)'):'';
     }
     var pp=Math.max(0,Math.min(1,window.scrollY/(vh*0.22)));
     if(prompt) prompt.style.opacity=String(1-pp);
@@ -281,41 +281,56 @@ function initMainThread3D(canvas, isMobile){
     function bresize(){ BW=bc.width=window.innerWidth; BH=bc.height=window.innerHeight; }
     bresize(); window.addEventListener('resize',bresize);
     var isMob=window.innerWidth<640;
-    var N=isMob?90:170;
+    var N=isMob?140:260;
     for(var i=0;i<N;i++){
       var a=Math.random()*Math.PI*2;
-      // kecepatan burst: cepat di awal, melambat (easing alami via pow)
-      pts.push({a:a, v:.55+Math.random()*1.15, s:Math.random()*2.2+.6,
+      // kecepatan burst: SANGAT cepat di awal (DUM!), melambat alami via pow
+      pts.push({a:a, v:.9+Math.random()*1.9, s:Math.random()*3+.8,
         hue:20+Math.random()*300, tw:Math.random()*6.28});
     }
     var bt0=performance.now();
-    var DUR=3500;
+    var DUR=3800;
+    // screen shake halus — berasa "DUM!"
+    var introEl=document.getElementById('intro');
     (function bang(){
       var intro=document.getElementById('intro');
       if(!intro || intro.classList.contains('gone')) return;
       var el=(performance.now()-bt0)/1000; // detik
       var t=Math.min(1,el/(DUR/1000));
-      bctx.fillStyle='rgba(4,4,6,.16)';
+      bctx.fillStyle='rgba(4,4,6,.14)';
       bctx.fillRect(0,0,BW,BH);
       var cx=BW/2, cy=BH/2, maxR=Math.max(BW,BH)*.75;
 
-      /* --- Fase 1: inti ledakan --- */
-      if(el<1.1){
-        var ft=el/1.1;
-        var coreR=(1-Math.pow(1-ft,3))*maxR*.28;
-        var coreA=Math.max(0,1-ft*1.15);
-        // inti putih panas
+      // screen shake: kuat di 0.3 detik pertama, lalu reda
+      if(introEl && el<0.6){
+        var shk=(1-el/0.6)*7;
+        var sx=(Math.random()-.5)*shk, sy=(Math.random()-.5)*shk;
+        introEl.style.transform='translate('+sx.toFixed(1)+'px,'+sy.toFixed(1)+'px)';
+      } else if(introEl && introEl.style.transform){
+        introEl.style.transform='';
+      }
+
+      /* --- Fase 1: inti ledakan — LEBIH TERANG & BESAR --- */
+      if(el<1.3){
+        var ft=el/1.3;
+        var coreR=(1-Math.pow(1-ft,3))*maxR*.38;
+        var coreA=Math.max(0,1-ft*1.05);
+        // inti putih PANAS — lebih terang, lebih besar
         var g=bctx.createRadialGradient(cx,cy,0,cx,cy,Math.max(1,coreR));
-        g.addColorStop(0,'rgba(255,252,244,'+(.95*coreA+.05)+')');
-        g.addColorStop(.35,'rgba(255,214,150,'+(.75*coreA)+')');
+        g.addColorStop(0,'rgba(255,255,255,'+(.99*coreA+.01)+')');
+        g.addColorStop(.25,'rgba(255,250,235,'+(.95*coreA)+')');
+        g.addColorStop(.55,'rgba(255,214,150,'+(.8*coreA)+')');
         g.addColorStop(1,'rgba(233,161,59,0)');
         bctx.fillStyle=g;
         bctx.beginPath(); bctx.arc(cx,cy,Math.max(1,coreR),0,7); bctx.fill();
-        // shockwave ring
-        var sw=(1-Math.pow(1-Math.min(1,ft*1.25),2))*maxR*.62;
-        bctx.strokeStyle='rgba(255,220,160,'+(.5*Math.max(0,1-ft))+')';
-        bctx.lineWidth=2.5*(1-ft)+.5;
-        bctx.beginPath(); bctx.arc(cx,cy,Math.max(1,sw),0,7); bctx.stroke();
+        // shockwave ring GANDA — lebih besar
+        for(var swi=0;swi<2;swi++){
+          var swt=Math.max(0,ft-swi*.18)/(1-swi*.18);
+          var sw=(1-Math.pow(1-Math.min(1,swt*1.3),2))*maxR*.78;
+          bctx.strokeStyle='rgba(255,225,170,'+(.6*Math.max(0,1-swt))+')';
+          bctx.lineWidth=3.5*(1-swt)+.5;
+          bctx.beginPath(); bctx.arc(cx,cy,Math.max(1,sw),0,7); bctx.stroke();
+        }
       }
 
       /* --- Fase 2: burst partikel --- */
