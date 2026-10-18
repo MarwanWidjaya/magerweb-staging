@@ -305,12 +305,64 @@ function initMainThread3D(canvas, isMobile){
   update();
 })();
 
+/* ---------- Space background: starfield halus di #nebula ----------
+   Bintang bertaburan subtle dengan DEPTH: jauh (kecil, redup, biru)
+   vs dekat (sedikit lebih besar, terang, putih). Konsisten di semua
+   section, tidak ganggu konten. Referensi poggufanz: "hitam pekat
+   bertabur bintang halus". */
+(function(){
+  try{
+    var neb=document.getElementById('nebula');
+    if(!neb || !window.getComputedStyle) return;
+    // pakai elemen child agar ::after tetap untuk twinkle
+    var layer=document.createElement('div');
+    layer.style.cssText='position:absolute;inset:0;pointer-events:none';
+    var W=window.innerWidth, H=window.innerHeight;
+    var isMob=W<640, N=isMob?110:190, shadows=[];
+    for(var i=0;i<N;i++){
+      var x=(Math.random()*W).toFixed(1), y=(Math.random()*H).toFixed(1);
+      var depth=Math.random(), size, op, col;
+      if(depth<.55){ size=.8+Math.random()*.7; op=.25+Math.random()*.3; col='170,190,255'; }      // jauh: kecil redup biru
+      else if(depth<.85){ size=1+Math.random()*1; op=.4+Math.random()*.35; col='220,230,255'; }   // tengah
+      else { size=1.4+Math.random()*1.2; op=.6+Math.random()*.35;
+             col=Math.random()<.12?'255,220,180':'235,240,255'; }                                // dekat: terang (sesekali hangat)
+      shadows.push(x+'px '+y+'px 0 '+size.toFixed(1)+'px rgba('+col+','+op.toFixed(2)+')');
+    }
+    layer.style.boxShadow=shadows.join(',');
+    // satu "bintang" semu 1px sebagai anchor agar box-shadow ter-render
+    layer.style.width='1px'; layer.style.height='1px';
+    var reduceM2=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(!reduceM2) layer.style.animation='starTwinkle 9s ease-in-out infinite';
+    neb.appendChild(layer);
+    // regenerasi saat resize/orientasi berubah
+    var rT=null;
+    window.addEventListener('resize',function(){
+      if(rT) clearTimeout(rT);
+      rT=setTimeout(function(){
+        try{
+          W=window.innerWidth; H=window.innerHeight;
+          var sh2=[];
+          for(var j=0;j<N;j++){
+            var x2=(Math.random()*W).toFixed(1), y2=(Math.random()*H).toFixed(1);
+            sh2.push(x2+'px '+y2+'px 0 1px rgba(200,215,255,.4)');
+          }
+          layer.style.boxShadow=sh2.join(',');
+        }catch(e){}
+      },400);
+    });
+  }catch(e){}
+})();
+
 /* ---------- Intro ---------- */
 (function(){
-  /* ===== BIG BANG: ledakan kosmik — flash inti + shockwave + burst partikel =====
-     Fase 1 (0–0.7s):   inti putih panas meledak, shockwave mengembang
-     Fase 2 (0.7–3.5s): partikel burst keluar dengan trail, warna mendingin
-                         putih → emas → ungu → biru, lalu merajut cosmic web */
+  /* ===== BIG BANG: ledakan kosmik REALISTIS =====
+     Fase 0 (0–0.35s):    ANTISIPASI — keheningan, titik kecil berdenyut di kegelapan
+     Fase 1 (0.35–0.6s):  FLASH MEMBUTAKAN — layar putih sesaat
+     Fase 2 (0.35–1.6s):  FIREBALL — bola plasma mengembang (putih→kuning→oranye→merah)
+     Fase 3 (0.4–2.2s):   SHOCKWAVE TRIPLE — 3 gelombang kejut
+     Fase 4 (0.4–3.8s):   PARTIKEL + DEBRIS — trail cahaya + puing beterbangan,
+                          warna mendingin: putih→kuning→oranye→merah→ungu→biru
+     Fase 5 (t>.45):      cosmic web merajut */
   (function(){
     var bc=document.getElementById('bangCanvas');
     if(!bc) return;
@@ -322,13 +374,18 @@ function initMainThread3D(canvas, isMobile){
     var N=isMob?140:260;
     for(var i=0;i<N;i++){
       var a=Math.random()*Math.PI*2;
-      // kecepatan burst: SANGAT cepat di awal (DUM!), melambat alami via pow
       pts.push({a:a, v:.9+Math.random()*1.9, s:Math.random()*3+.8,
         hue:20+Math.random()*300, tw:Math.random()*6.28});
     }
+    // DEBRIS — puing-puing besar yang beterbangan (bukan titik)
+    var debris=[], DN=isMob?16:30;
+    for(var di0=0;di0<DN;di0++){
+      debris.push({a:Math.random()*Math.PI*2, v:.45+Math.random()*.85,
+        s:4+Math.random()*9, rot:Math.random()*6.28, vr:(Math.random()-.5)*5,
+        hue:12+Math.random()*28, seed:di0});
+    }
     var bt0=performance.now();
-    var DUR=3800;
-    // screen shake halus — berasa "DUM!"
+    var DUR=4000;
     var introEl=document.getElementById('intro');
     (function bang(){
       var intro=document.getElementById('intro');
@@ -339,61 +396,124 @@ function initMainThread3D(canvas, isMobile){
       bctx.fillRect(0,0,BW,BH);
       var cx=BW/2, cy=BH/2, maxR=Math.max(BW,BH)*.75;
 
-      // screen shake: kuat di 0.3 detik pertama, lalu reda
-      if(introEl && el<0.6){
-        var shk=(1-el/0.6)*7;
-        var sx=(Math.random()-.5)*shk, sy=(Math.random()-.5)*shk;
-        introEl.style.transform='translate('+sx.toFixed(1)+'px,'+sy.toFixed(1)+'px)';
-      } else if(introEl && introEl.style.transform){
-        introEl.style.transform='';
+      // screen shake: paling kuat saat flash+fireball (0.35–1.2s)
+      if(introEl){
+        if(el>=0.3&&el<1.2){
+          var shk=(1-(el-0.3)/0.9)*9;
+          introEl.style.transform='translate('+((Math.random()-.5)*shk).toFixed(1)+'px,'+((Math.random()-.5)*shk).toFixed(1)+'px)';
+        } else if(introEl.style.transform){
+          introEl.style.transform='';
+        }
       }
 
-      /* --- Fase 1: inti ledakan — LEBIH TERANG & BESAR --- */
-      if(el<1.3){
-        var ft=el/1.3;
-        var coreR=(1-Math.pow(1-ft,3))*maxR*.38;
-        var coreA=Math.max(0,1-ft*1.05);
-        // inti putih PANAS — lebih terang, lebih besar
-        var g=bctx.createRadialGradient(cx,cy,0,cx,cy,Math.max(1,coreR));
-        g.addColorStop(0,'rgba(255,255,255,'+(.99*coreA+.01)+')');
-        g.addColorStop(.25,'rgba(255,250,235,'+(.95*coreA)+')');
-        g.addColorStop(.55,'rgba(255,214,150,'+(.8*coreA)+')');
-        g.addColorStop(1,'rgba(233,161,59,0)');
+      /* --- Fase 0: ANTISIPASI — titik kecil berdenyut di kegelapan --- */
+      if(el<0.35){
+        var at=el/0.35;
+        var pulseR=2.5+Math.sin(el*38)*1.6+at*9;
+        var pg=bctx.createRadialGradient(cx,cy,0,cx,cy,Math.max(1,pulseR*5));
+        pg.addColorStop(0,'rgba(255,255,255,'+(.45+at*.5)+')');
+        pg.addColorStop(.3,'rgba(190,215,255,'+(.35*at)+')');
+        pg.addColorStop(1,'rgba(90,130,255,0)');
+        bctx.fillStyle=pg;
+        bctx.beginPath(); bctx.arc(cx,cy,Math.max(1,pulseR*5),0,7); bctx.fill();
+      }
+
+      /* --- Fase 1: FLASH MEMBUTAKAN — layar putih sesaat --- */
+      if(el>=0.35&&el<0.8){
+        var fl=(el-0.35)/0.45;
+        var flashA=fl<0.33 ? fl/0.33 : Math.max(0,1-(fl-0.33)/0.67);
+        bctx.fillStyle='rgba(255,253,246,'+(flashA*.96)+')';
+        bctx.fillRect(0,0,BW,BH);
+      }
+
+      /* --- Fase 2: FIREBALL — bola plasma mengembang, tepi turbulent --- */
+      if(el>=0.35&&el<1.7){
+        var fbt=(el-0.35)/1.35;
+        var fbR=(1-Math.pow(1-fbt,2.6))*maxR*.44;
+        var fbA=Math.max(0,1-fbt*1.08);
+        // warna fireball realistis: putih → kuning → oranye → merah
+        var fr,fg,fb2;
+        if(fbt<.28){ fr=255; fg=252; fb2=240; }
+        else if(fbt<.52){ fr=255; fg=216; fb2=150; }
+        else if(fbt<.76){ fr=255; fg=142; fb2=58; }
+        else { fr=205; fg=62; fb2=28; }
+        var edge=1+Math.sin(el*29)*.045+Math.sin(el*53+1.3)*.03+Math.sin(el*71+.7)*.02;
+        var g=bctx.createRadialGradient(cx,cy,0,cx,cy,Math.max(1,fbR*edge));
+        g.addColorStop(0,'rgba(255,255,255,'+(.99*fbA)+')');
+        g.addColorStop(.32,'rgba('+fr+','+fg+','+fb2+','+(.92*fbA)+')');
+        g.addColorStop(.68,'rgba('+((fr*.68)|0)+','+((fg*.42)|0)+','+((fb2*.28)|0)+','+(.52*fbA)+')');
+        g.addColorStop(1,'rgba(110,35,8,0)');
         bctx.fillStyle=g;
-        bctx.beginPath(); bctx.arc(cx,cy,Math.max(1,coreR),0,7); bctx.fill();
-        // shockwave ring GANDA — lebih besar
-        for(var swi=0;swi<2;swi++){
-          var swt=Math.max(0,ft-swi*.18)/(1-swi*.18);
-          var sw=(1-Math.pow(1-Math.min(1,swt*1.3),2))*maxR*.78;
-          bctx.strokeStyle='rgba(255,225,170,'+(.6*Math.max(0,1-swt))+')';
-          bctx.lineWidth=3.5*(1-swt)+.5;
+        bctx.beginPath(); bctx.arc(cx,cy,Math.max(1,fbR*edge),0,7); bctx.fill();
+      }
+
+      /* --- Fase 3: SHOCKWAVE TRIPLE --- */
+      if(el>=0.4&&el<2.3){
+        for(var swi=0;swi<3;swi++){
+          var swt=(el-0.4-swi*.22)/1.7;
+          if(swt<0||swt>1) continue;
+          var sw=(1-Math.pow(1-swt,1.8))*maxR*.86;
+          var swA=Math.max(0,1-swt);
+          bctx.strokeStyle='rgba(255,'+((195+swA*60)|0)+',165,'+(.6*swA)+')';
+          bctx.lineWidth=(4.5-swi)*(1-swt)+.5;
           bctx.beginPath(); bctx.arc(cx,cy,Math.max(1,sw),0,7); bctx.stroke();
         }
       }
 
-      /* --- Fase 2: burst partikel --- */
+      /* --- Fase 4a: DEBRIS — puing beterbangan --- */
+      if(el>=0.4){
+        for(var ddi=0;ddi<debris.length;ddi++){
+          var d=debris[ddi];
+          var drt=1-Math.pow(1-Math.min(1,t*1.08),2.1);
+          var dr=drt*d.v*maxR*.82;
+          var dx=cx+Math.cos(d.a)*dr, dy=cy+Math.sin(d.a)*dr;
+          var dA=Math.max(0,1-t*1.15)*Math.min(1,(el-0.4)*3);
+          if(dA<=0.01) continue;
+          bctx.save();
+          bctx.translate(dx,dy);
+          bctx.rotate(d.rot+el*d.vr);
+          bctx.fillStyle='hsla('+d.hue+',92%,'+(42+t*22)+'%,'+(dA*.92)+')';
+          bctx.beginPath();
+          var ns=5+((d.seed*7)%3), vx, vy, va2, vr2;
+          for(var vi=0;vi<ns;vi++){
+            va2=vi/ns*Math.PI*2;
+            vr2=d.s*(0.55+((d.seed*13+vi*7)%10)/13);
+            vx=Math.cos(va2)*vr2; vy=Math.sin(va2)*vr2;
+            if(vi===0) bctx.moveTo(vx,vy); else bctx.lineTo(vx,vy);
+          }
+          bctx.closePath(); bctx.fill();
+          // glow di sekitar puing
+          bctx.fillStyle='hsla('+d.hue+',95%,65%,'+(dA*.25)+')';
+          bctx.beginPath(); bctx.arc(0,0,d.s*1.8,0,7); bctx.fill();
+          bctx.restore();
+        }
+      }
+
+      /* --- Fase 4b: burst partikel dengan trail --- */
       for(var i=0;i<pts.length;i++){
         var p=pts[i];
-        // easing keluar: cepat lalu melambat
         var rt=1-Math.pow(1-Math.min(1,t*1.15),2.2);
         var r=rt*p.v*maxR;
         var x=cx+Math.cos(p.a)*r, y=cy+Math.sin(p.a)*r;
-        // warna mendingin seiring waktu: putih → emas → ungu → biru
-        var hue, sat=85, lit=68;
-        if(t<.25){ hue=45; lit=88; }
-        else if(t<.5){ hue=30+p.hue*.1; lit=70; }
-        else { hue=265+((p.hue*37)%60); }
-        var alpha=Math.min(1,t*3)*Math.max(0,1-t*.55)*(.55+.45*Math.sin(el*4+p.tw));
-        // trail: garis pendek ke arah gerak
+        // warna mendingin REALISTIS: putih → kuning → oranye → merah → ungu → biru
+        var hue, sat=90, lit=70;
+        if(t<.14){ hue=52; sat=100; lit=93; }
+        else if(t<.28){ hue=38; sat=96; lit=76; }
+        else if(t<.44){ hue=22; sat=93; lit=61; }
+        else if(t<.60){ hue=8; sat=89; lit=53; }
+        else if(t<.78){ hue=282; sat=76; lit=59; }
+        else { hue=218+((p.hue*37)%42); sat=82; lit=63; }
+        var alpha=Math.min(1,Math.max(0,(el-0.35))*3)*Math.max(0,1-t*.55)*(.55+.45*Math.sin(el*4+p.tw));
+        if(alpha<=0.01) continue;
         var tx=cx+Math.cos(p.a)*Math.max(0,r-14*p.v), ty=cy+Math.sin(p.a)*Math.max(0,r-14*p.v);
         bctx.strokeStyle='hsla('+hue+','+sat+'%,'+lit+'%,'+(alpha*.5)+')';
         bctx.lineWidth=p.s*.7;
         bctx.beginPath(); bctx.moveTo(tx,ty); bctx.lineTo(x,y); bctx.stroke();
-        bctx.fillStyle='hsla('+hue+','+sat+'%,'+Math.min(95,lit+12)+'%,'+alpha+')';
+        bctx.fillStyle='hsla('+hue+','+sat+'%,'+Math.min(96,lit+12)+'%,'+alpha+')';
         bctx.beginPath(); bctx.arc(x,y,p.s,0,7); bctx.fill();
       }
 
-      /* --- cosmic web: merajut setelah ledakan mereda --- */
+      /* --- Fase 5: cosmic web: merajut setelah ledakan mereda --- */
       if(t>.45){
         var wt=(t-.45)/.55;
         for(var i2=0;i2<pts.length;i2+=3){
