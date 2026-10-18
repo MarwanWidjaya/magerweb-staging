@@ -41,8 +41,14 @@ a{color:inherit}
   background:
     radial-gradient(ellipse 55% 40% at 12% 18%, rgba(255,107,53,.055), transparent 60%),
     radial-gradient(ellipse 50% 38% at 88% 72%, rgba(125,211,252,.05), transparent 60%),
-    radial-gradient(ellipse 38% 30% at 72% 12%, rgba(255,107,53,.03), transparent 60%);
+    radial-gradient(ellipse 38% 30% at 72% 12%, rgba(255,107,53,.03), transparent 60%),
+    /* nebula dalam: ungu/biru sangat samar di kejauhan */
+    radial-gradient(ellipse 46% 34% at 30% 62%, rgba(88,60,180,.06), transparent 65%),
+    radial-gradient(ellipse 40% 32% at 62% 30%, rgba(45,80,190,.055), transparent 65%),
+    radial-gradient(ellipse 30% 24% at 45% 88%, rgba(120,70,200,.045), transparent 65%);
 }
+#nebula::after{content:"";position:absolute;inset:0;background:transparent}
+@keyframes starTwinkle{0%,100%{opacity:.82}50%{opacity:1}}
 main,.footer{position:relative;z-index:1}
 section[id]{scroll-margin-top:80px}
 
