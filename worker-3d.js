@@ -36,6 +36,7 @@ var BH_FRAG_SRC = [
 'uniform float uFall;',
 'uniform vec2 uCenter;',
 'uniform float uHorizon;',
+'uniform float uQuality;',
 'out vec4 fragColor;',
 '',
 'float hash11(float p){ p=fract(p*0.1031); p*=p+33.33; p*=p+p; return fract(p); }',
@@ -52,6 +53,18 @@ var BH_FRAG_SRC = [
 '  float v=0.0; float a=0.5;',
 '  mat2 r=mat2(0.8,0.6,-0.6,0.8);',
 '  for(int i=0;i<5;i++){ v+=a*vnoise(p); p=r*p*2.03; a*=0.5; }',
+'  return v;',
+'}',
+'/* fbmQ: octaves dikontrol uQuality (0.0=low -> 2 oct, 1.0=high -> 5 oct).',
+'   Hemat GPU di perangkat lemah tanpa mengubah visual quality high. */',
+'float fbmQ(vec2 p){',
+'  float oct=mix(2.0,5.0,uQuality);',
+'  float v=0.0; float a=0.5;',
+'  mat2 r=mat2(0.8,0.6,-0.6,0.8);',
+'  for(int i=0;i<5;i++){',
+'    float w=clamp(oct-float(i),0.0,1.0);',
+'    v+=a*vnoise(p)*w; p=r*p*2.03; a*=0.5;',
+'  }',
 '  return v;',
 '}',
 'vec2 voronoi(vec2 p){',
@@ -112,14 +125,14 @@ var BH_FRAG_SRC = [
 '    vec2 d0=p-uCenter;',
 '    float r0=length(d0);',
 '    float a0=atan(d0.y,d0.x);',
-'    float s=0.5+0.5*sin(a0*54.0+fbm(p*3.0+t*0.7)*5.0);',
+'    float s=0.5+0.5*sin(a0*54.0+fbmQ(p*3.0+t*0.7)*5.0);',
 '    float rays=s*s; rays*=rays; rays*=s;',
 '    col+=vec3(1.0,0.90,0.72)*rays*exp(-r0*1.7)*radialAmt*2.4;',
 '  }',
 '  {',
 '    vec2 vv=voronoi(p*6.0+vec2(t*0.04,-t*0.025));',
 '    float edge=1.0-smoothstep(0.0,0.10,vv.y-vv.x);',
-'    vec3 wc=mix(vec3(0.48,0.12,0.88),vec3(1.0,0.30,0.62),fbm(p*4.0+3.7));',
+'    vec3 wc=mix(vec3(0.48,0.12,0.88),vec3(1.0,0.30,0.62),fbmQ(p*4.0+3.7));',
 '    col+=wc*edge*webAmt*1.35;',
 '  }',
 '  {',
@@ -198,7 +211,7 @@ var BH_FRAG_SRC = [
 '    float upm=smoothstep(0.06,0.60,sm);',
 '    float heat=pow(clamp(upm,0.0,1.0),1.4);',
 '    vec3 ac=gasColor(0.55+0.40*heat);',
-'    float at=fbm(vec2(atan(ep.y,ep.x)*2.0,er*4.0-t*0.4));',
+'    float at=fbmQ(vec2(atan(ep.y,ep.x)*2.0,er*4.0-t*0.4));',
 '    bh+=ac*band*upm*(2.3+0.70*at)*bhAmt;',
 '  }',
 '  {',
@@ -225,7 +238,7 @@ var BH_FRAG_SRC = [
 '    float rad=1.0-clamp((r-diskIn)/(diskOut-diskIn),0.0,1.0);',
 '    float heat=pow(clamp(rad,0.0,1.0),1.5);',
 '    float beam=1.0-0.58*cos(ang);',
-'    float turb=fbm(vec2(ang*2.5,r*7.0-t*1.1));',
+'    float turb=fbmQ(vec2(ang*2.5,r*7.0-t*1.1));',
 '    float streak=0.85+0.30*sin(ang*22.0+r*26.0-t*2.2);',
 '    float rings=0.78+0.30*sin(r*58.0-t*1.7+turb*4.0);',
 '    float db=band*inM*outM*(0.30+0.70*heat)*beam*(0.70+0.60*turb)*streak*rings;',
@@ -267,9 +280,13 @@ var BH_FRAG_SRC = [
 '  float cdist=length(cdir);',
 '  vec2 coff=cdir*(cdist*0.003);',
 '  vec3 bh;',
-'  bh.r=renderBH(uv0+coff).r;',
-'  bh.g=renderBH(uv0).g;',
-'  bh.b=renderBH(uv0-coff).b;',
+'  if(uQuality>0.6){',
+'    bh.r=renderBH(uv0+coff).r;',
+'    bh.g=renderBH(uv0).g;',
+'    bh.b=renderBH(uv0-coff).b;',
+'  }else{',
+'    bh=renderBH(uv0);',
+'  }',
 '  vec3 hdr=bg+bh;',
 '  /* 2. ACES TONE MAPPING (menggantikan Reinhard): highlight rolloff',
 '     filmic, mid-tone lebih natural. exposure 1.2. */',
@@ -289,7 +306,7 @@ var BH_FRAG_SRC = [
 
 /* ==================== RAW WebGL2 ENGINE ==================== */
 var gl=null, bhProg=null, bhVAO=null;
-var uResL=null, uTimeL=null, uApproachL=null, uFallL=null, uCenterL=null, uHorizonL=null;
+var uResL=null, uTimeL=null, uApproachL=null, uFallL=null, uCenterL=null, uHorizonL=null, uQualityL=null;
 var canvasEl=null, bufW=0, bufH=0, aspectNow=1.6;
 var glBHReady=false;
 
@@ -321,6 +338,7 @@ function initBHGL(){
   uFallL=gl.getUniformLocation(bhProg,'uFall');
   uCenterL=gl.getUniformLocation(bhProg,'uCenter');
   uHorizonL=gl.getUniformLocation(bhProg,'uHorizon');
+  uQualityL=gl.getUniformLocation(bhProg,'uQuality');
   bhVAO=gl.createVertexArray();
   gl.bindVertexArray(bhVAO);
   var vbo=gl.createBuffer();
@@ -346,6 +364,7 @@ function renderBH(time, approach, fall, cx, cy, horizon){
   gl.uniform1f(uFallL, fall);
   gl.uniform2f(uCenterL, cx, cy);
   gl.uniform1f(uHorizonL, horizon);
+  gl.uniform1f(uQualityL, qUniform);
   gl.bindVertexArray(bhVAO);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   gl.bindVertexArray(null);
@@ -430,6 +449,16 @@ var journey=0, targetJourney=0;
 var isMobile=false, running=true, rafId=0;
 var baseFov=62;
 var simTime=0, lastT=-1;
+/* Tahap 2: quality adaptif. qLevel: 0=low, 1=medium, 2=high.
+   qInit = level awal dari deteksi perangkat (batas atas auto step-up).
+   qUniform dipetakan ke uniform GLSL uQuality (0.0 / 0.5 / 1.0). */
+var qLevel=2, qInit=2, qUniform=1.0;
+var fpsEMA=60, lastQCheck=-10000;
+var lastW=0, lastH=0, lastDPR=1;
+function applyQuality(){
+  qUniform=[0.0,0.5,1.0][qLevel];
+  if(lastW>0) setSize(lastW,lastH,lastDPR);
+}
 /* Fase 1 revisi: lapor progress intro ke main thread (throttled).
    Counter DOM di-overlay di atas animasi shader, sync ke uTime. */
 var lastIntroSent=-1, introDone=false;
@@ -544,7 +573,10 @@ function buildTesseract(){
 }
 
 function setSize(W,H,DPR){
-  var dpr=Math.min(DPR||1, isMobile?1.5:2);
+  lastW=W; lastH=H; if(DPR) lastDPR=DPR;
+  /* Tahap 2: quality low -> render 0.75x (hemat GPU signifikan). */
+  var qScale=qLevel===0?0.75:1.0;
+  var dpr=Math.min((DPR||1)*qScale, isMobile?1.5:2);
   aspectNow=W/Math.max(1,H);
   if(renderer){
     renderer.setPixelRatio(dpr);
@@ -595,6 +627,19 @@ function frame(t){
   if(lastT<0){ lastT=t; }
   var dt=Math.min((t-lastT)/1000, 0.1); lastT=t;
   simTime+=dt;
+
+  /* Tahap 2: FPS auto-degrade (hanya saat shader BH aktif).
+     <30fps dievaluasi tiap 2 dtk -> turun 1 level;
+     >50fps -> naik 1 level (tidak melebihi qInit dari deteksi perangkat). */
+  if(glBHReady && dt>0){
+    var fpsNow=1/Math.max(dt,1e-4);
+    fpsEMA+=(fpsNow-fpsEMA)*0.05;
+    if(t-lastQCheck>2000){
+      lastQCheck=t;
+      if(fpsEMA<30 && qLevel>0){ qLevel--; applyQuality(); }
+      else if(fpsEMA>50 && qLevel<qInit){ qLevel++; applyQuality(); }
+    }
+  }
 
   var dj=Math.abs(targetJourney-journey);
   var distToEdge=Math.min(Math.abs(journey-.30), Math.abs(journey-.44));
@@ -659,6 +704,9 @@ onmessage=function(e){
   var m=e.data;
   try{
     if(m.type==='init'){
+      /* Tahap 2: level awal dari deteksi perangkat (main thread). */
+      qLevel=(typeof m.quality==='number')?Math.max(0,Math.min(2,m.quality|0)):2;
+      qInit=qLevel; qUniform=[0.0,0.5,1.0][qLevel];
       var ok=buildScene(m.canvas, m.width, m.height, m.dpr, m.isMobile);
       if(ok){
         postMessage({type:'ready'});
