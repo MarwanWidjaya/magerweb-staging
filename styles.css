@@ -157,7 +157,7 @@ section[id]{scroll-margin-top:80px}
 .room-tag{position:absolute;top:1.1rem;right:1.3rem;font-size:.64rem;letter-spacing:.2em;
   color:var(--accent);border:1px solid rgba(255,107,53,.4);border-radius:100px;padding:.3rem .8rem;z-index:2;
   background:rgba(5,5,7,.5);backdrop-filter:blur(4px)}
-.room:hover /* visual per room — gradient kosmik unik */
+/* visual per room — gradient kosmik unik */
 .rv-kopi{background:
   radial-gradient(circle at 78% 18%, rgba(232,185,106,.5), transparent 46%),
   radial-gradient(circle at 18% 82%, rgba(120,72,32,.65), transparent 55%),
@@ -368,14 +368,7 @@ section[id]{scroll-margin-top:80px}
 .problem-card h3{font-size:1.25rem;margin:0 0 .7rem;letter-spacing:-.01em}
 .problem-card p{color:var(--dim);font-size:.95rem;line-height:1.65;margin:0}
 
-/* Transformation visual: chaos → order */
-.transform-visual{margin:3rem auto 0;max-width:640px;text-align:center}
-.tv-row{display:flex;justify-content:center;gap:1.4rem;flex-wrap:wrap;font-size:.78rem;letter-spacing:.28em}
-.tv-chaos span{color:var(--faint);opacity:.55;transform:rotate(-2deg);display:inline-block}
-.tv-chaos span:nth-child(2){transform:rotate(3deg) translateY(4px)}
-.tv-chaos span:nth-child(3){transform:rotate(-4deg) translateY(-3px)}
-.tv-order span{color:var(--accent);display:inline-block}
-.tv-arrow{font-size:1.6rem;color:#E9A13B;margin:1.2rem 0;animation:cueDrop 2s ease-in-out infinite}
+/* (transform-visual dihapus — section CH.02 disederhanakan) */
 
 /* ============ TESSERACT LIVE DEMO PANEL ============ */
 .tess-demo{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;
@@ -417,8 +410,8 @@ section[id]{scroll-margin-top:80px}
 .hero .wrap{position:relative;z-index:3;text-shadow:0 2px 24px rgba(0,0,0,.8)}
 /* Pastikan heading selalu off-white solid */
 .sec-title,.hero h1{color:#F2EFE6}
-/* Label mono: abu konsisten */
-.sec-index,.mono{color:#8A8A8A}
+/* Label section: abu konsisten (jangan override .mono global — merusak warna aksen) */
+.sec-index{color:#8A8A8A}
 .sec-index b,.sec-index .gold{color:#E9A13B}
 
 /* ============ HYPERSPACE WARP ============ */
@@ -450,7 +443,7 @@ section[id]{scroll-margin-top:80px}
 
 
 /* Dive prompt */
-.dive-prompt{margin-top:2rem;font-size:.85rem;letter-spacing:.35em;color:var(--gold);
+.dive-prompt{margin-top:2rem;font-size:.85rem;letter-spacing:.35em;color:var(--accent);
   text-transform:uppercase;opacity:.9;animation:pulse 2s ease-in-out infinite}
 .dive-arrow{display:inline-block;animation:bounce 1.5s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
@@ -459,8 +452,9 @@ section[id]{scroll-margin-top:80px}
 /* ============ POGGUFANZ MATCH — DEPTH number · split title · FIG note ============ */
 .dm-num{font-size:1.05rem;font-weight:500;letter-spacing:.12em;color:var(--ink);
   writing-mode:vertical-rl;min-height:44px;text-align:center}
-/* Judul split ala referensi: baris pertama tipis, sisanya tebal */
+/* Judul split ala referensi: baris pertama tipis, baris kedua tebal, baris ketiga aksen */
 .title-thin{font-weight:300;letter-spacing:.01em;color:rgba(242,237,228,.92)}
+.title-bold{font-weight:700;letter-spacing:-.045em}
 /* Anotasi FIG di kanan atas black hole */
 .fig-note{position:absolute;top:clamp(5.5rem,14vh,8rem);right:clamp(1.2rem,6vw,4rem);
   font-size:.62rem;letter-spacing:.22em;line-height:2;color:var(--dim);text-align:right;z-index:3}
