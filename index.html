@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self'; worker-src 'self'; frame-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'">
 <title>MAGERWEB® — Studio Digital Kosmik untuk Brand Ambisius</title>
 <meta name="google-site-verification" content="Kxg2Utth_k7taKQ7SZPxJfV6QwFzXOCOrWaaVl9tIHc" />
 <meta name="description" content="MAGERWEB adalah studio digital independen yang merancang website premium dan pengalaman digital untuk brand ambisius. Desain website, e-commerce, landing page & identitas brand.">
@@ -17,8 +18,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css?v=20261017a">
-<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script src="https://unpkg.com/lucide@1.59.0/dist/umd/lucide.min.js" integrity="sha384-4VQAGBhahgTiMVvXUqbh6qcs45zGzR/8znv7XORRfWkxZfzRbhLL5Uh+fSdvdqdM" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js" integrity="sha384-qOkzR5Ke/XkQxuGVJ9hpFEpDlcoLtWwVYhnJf06cLIZa2vaIptSqaubivErzmD5O" crossorigin="anonymous"></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"ProfessionalService","name":"MAGERWEB","url":"https://marwanwidjaya.github.io/magerweb/","description":"Studio digital independen yang merancang website premium dan pengalaman digital. Desain website, e-commerce, landing page, identitas brand.","telephone":"+62-857-2380-3537","priceRange":"Rp250rb - Rp1jt+","areaServed":"ID"}
 </script>
@@ -82,6 +83,7 @@
     </nav>
     <div class="nav-right">
       <span class="clock mono" id="clock">--:--</span>
+      <button class="sound-toggle mono" id="soundToggle" aria-label="Nyalakan/matikan suara latar" aria-pressed="false"><span class="st-on">SOUND ON</span><span class="st-off">MUTED</span></button>
       <a class="btn btn-accent btn-sm" href="https://wa.me/6285723803537?text=Halo%20MAGERWEB,%20saya%20ingin%20memulai%20proyek%20website." target="_blank" rel="noopener">Mari Bicara <i data-lucide="arrow-up-right"></i></a>
       <button class="nav-burger" id="navBurger" aria-label="Buka menu" aria-expanded="false"><span></span><span></span></button>
     </div>
@@ -94,7 +96,7 @@
 <section class="hero">
   <div class="wrap">
     <p class="epoch mono rv"><b class="gold">CH.00</b> — AWAL · STUDIO DIGITAL — TASIKMALAYA, ID · <span id="heroDate"></span></p>
-    <h1 class="hero-title rv scramble"><span class="title-thin">WEBSITE</span><br><span class="title-bold">YANG BEDA</span><br><span class="accent-glow">ORBIT.</span></h1>
+    <h1 class="hero-title rv split split--warp"><span class="title-thin">WEBSITE</span><br><span class="title-bold">YANG BEDA</span><br><span class="accent-glow">ORBIT.</span></h1>
     <p class="fig-note mono rv">FIG. 00 — THE SINGULARITY<br>JASA PEMBUATAN WEBSITE · INDONESIA</p>
   <p class="dive-prompt">SCROLL UNTUK MASUK KE SINGULARITAS <span class="dive-arrow">↓</span></p>
     <p class="hero-sub rv">MAGERWEB merancang website premium untuk brand yang ambisius — <b>cepat</b>, <b>memukau di HP</b>, dan <b>dibangun untuk konversi</b>. Bukan template. Bukan asal jadi.</p>
@@ -124,7 +126,7 @@
     <div class="sec-head rv">
       <div>
         <p class="sec-index mono"><b class="gold">CH.01</b> — MASALAH</p>
-        <h2 class="sec-title scramble">Bisnis Anda bagus.<br><em>Website-nya belum.</em></h2>
+        <h2 class="sec-title split split--rise">Bisnis Anda bagus.<br><em>Website-nya belum.</em></h2>
         <p class="sec-desc">Tiga masalah yang diam-diam menggerogoti bisnis yang belum serius di digital:</p>
       </div>
       <div class="sec-count mono">FIG. 01</div>
@@ -155,7 +157,7 @@
     <div class="sec-head rv">
       <div>
         <p class="sec-index mono"><b class="gold">CH.02</b> — TRANSFORMASI</p>
-        <h2 class="sec-title scramble">Dari kekacauan,<br><em>menjadi sistem.</em></h2>
+        <h2 class="sec-title split split--rise">Dari kekacauan,<br><em>menjadi sistem.</em></h2>
         <p class="sec-desc">MagerWeb merancang ulang kehadiran digital Anda — desain, informasi, dan proses menyatu menjadi satu kesatuan yang bekerja.</p>
       </div>
       <div class="sec-count mono">FIG. 02</div>
@@ -169,7 +171,7 @@
     <div class="sec-head rv">
       <div>
         <p class="sec-index mono"><b class="gold">CH.03</b> — KENAPA MAGERWEB</p>
-        <h2 class="sec-title scramble">Dibangun beda,<br><em>dengan sengaja.</em></h2>
+        <h2 class="sec-title split split--rise">Dibangun beda,<br><em>dengan sengaja.</em></h2>
       </div>
     </div>
     <div class="why-grid">
@@ -203,7 +205,7 @@
     <div class="sec-head rv">
       <div>
         <p class="sec-index mono"><b class="accent">01</b> — KARYA PILIHAN</p>
-        <h2 class="sec-title scramble">Inside the<br><em>tesseract.</em></h2>
+        <h2 class="sec-title split split--rise">Inside the<br><em>tesseract.</em></h2>
         <p class="sec-desc">Melewati horizon, waktu adalah arah yang bisa dijelajahi. Enam eksplorasi orisinal di dalam lattice.</p>
       </div>
     </div>
@@ -332,7 +334,7 @@
     <div class="sec-head rv">
       <div>
         <p class="sec-index mono"><b class="gold">CH.04</b> — STUDI KASUS</p>
-        <h2 class="sec-title scramble">Membedah sebuah <em>konsep.</em></h2>
+        <h2 class="sec-title split split--rise">Membedah sebuah <em>konsep.</em></h2>
         <p class="sec-desc">Cara kami berpikir — dari brief hingga keputusan desain.</p>
       </div>
     </div>
@@ -365,7 +367,7 @@
     <div class="sec-head rv">
       <div>
         <p class="sec-index mono"><b class="gold">CH.05</b> — LAYANAN</p>
-        <h2 class="sec-title scramble">Modul <em>misi.</em></h2>
+        <h2 class="sec-title split split--rise">Modul <em>misi.</em></h2>
         <p class="sec-desc">Tujuh modul, satu standar: karya yang berani kami beri nama. Setiap kerja sama dimulai dengan konsultasi gratis — tanpa komitmen.</p>
       </div>
       <div class="sec-count mono">MODULES 07</div>
@@ -451,7 +453,7 @@
     <div class="sec-head rv">
       <div>
         <p class="sec-index mono"><b class="gold">CH.06</b> — PROSES</p>
-        <h2 class="sec-title scramble">Dari brief<br>hingga <em>launch.</em></h2>
+        <h2 class="sec-title split split--rise">Dari brief<br>hingga <em>launch.</em></h2>
         <p class="sec-desc">Lima fase misi yang disiplin. Anda tahu apa yang terjadi di setiap langkah — tanpa kotak hitam.</p>
       </div>
       <div class="sec-count mono">PHASES 05</div>
@@ -463,7 +465,7 @@
       <li class="rv"><span class="p-num mono">04</span><div><h3>Development</h3><p>Dibangun bersih, cepat, responsif. Diuji di perangkat nyata, dioptimasi untuk mesin pencari sejak hari pertama.</p></div><span class="p-line"></span></li>
       <li class="rv"><span class="p-num mono">05</span><div><h3>Launch</h3><p>Deployment, serah terima, dan panduan berbahasa sederhana agar Anda percaya diri menjalankan website.</p></div><span class="p-line"></span></li>
     </ol>
-    <div class="rv" style="margin-top:2.5rem">
+    <div class="rv rv-mt">
       <a class="btn btn-ghost" href="brief.html">Isi Brief Proyek <i data-lucide="arrow-right"></i></a>
     </div>
   </div>
@@ -474,7 +476,7 @@
   <div class="wrap about-grid">
     <div class="rv">
       <p class="sec-index mono"><b class="gold">CH.07</b> — TENTANG</p>
-      <h2 class="sec-title scramble">Studio kecil,<br>standar <em>tinggi.</em></h2>
+      <h2 class="sec-title split split--rise">Studio kecil,<br>standar <em>tinggi.</em></h2>
     </div>
     <div class="about-copy rv">
       <p class="about-lead">MAGERWEB adalah studio digital independen berbasis di Indonesia — fokus pada satu hal: website dan pengalaman digital yang dikerjakan dengan benar.</p>
@@ -491,7 +493,7 @@
     <div class="sec-head rv">
       <div>
         <p class="sec-index mono"><b class="gold">CH.08</b> — FAQ</p>
-        <h2 class="sec-title scramble">Pertanyaan, <em>terjawab.</em></h2>
+        <h2 class="sec-title split split--rise">Pertanyaan, <em>terjawab.</em></h2>
       </div>
     </div>
     <div class="faq-list" id="faqList">
@@ -509,7 +511,7 @@
 <section class="final-cta">
   <div class="wrap rv">
     <p class="sec-index mono"><b class="gold">CH.09</b> — MULAI</p>
-    <h2 class="scramble cta-title">Siap masuk<br><em>orbit</em> baru?</h2>
+    <h2 class="split split--rise cta-title">Siap masuk<br><em>orbit</em> baru?</h2>
     <p class="cta-sub">Ceritakan ke mana bisnis Anda akan melangkah. Kami petakan jalan tercepat untuk sampai ke sana — konsultasi gratis, tanpa komitmen.</p>
     <div class="cta-btns">
       <a class="btn btn-accent btn-xl" href="https://wa.me/6285723803537?text=Halo%20MAGERWEB,%20saya%20ingin%20konsultasi%20gratis%20tentang%20proyek%20website." target="_blank" rel="noopener"><i data-lucide="message-circle"></i> Mulai Proyek</a>
@@ -529,7 +531,7 @@
         <p>Studio digital independen yang merancang website premium & pengalaman digital untuk brand yang ambisius.</p>
         <div class="foot-social">
           <a href="https://wa.me/6285723803537" target="_blank" rel="noopener" aria-label="WhatsApp"><i data-lucide="message-circle"></i></a>
-          <a href="https://github.com/marwanwidjaya" target="_blank" rel="noopener" aria-label="GitHub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:17px;height:17px"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg></a>
+          <a class="icon-link" href="https://github.com/marwanwidjaya" target="_blank" rel="noopener" aria-label="GitHub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg></a>
         </div>
       </div>
       <nav aria-label="Navigasi footer studio">
@@ -550,7 +552,7 @@
         <h4 class="mono">KONTAK</h4>
         <a href="https://wa.me/6285723803537" target="_blank" rel="noopener">+62 857-2380-3537</a>
         <p class="foot-note">WhatsApp — respons tercepat.<br>Indonesia · melayani seluruh dunia.</p>
-        <a class="btn btn-accent btn-sm" href="https://wa.me/6285723803537?text=Halo%20MAGERWEB!" target="_blank" rel="noopener" style="margin-top:14px">Mari Bicara <i data-lucide="arrow-up-right"></i></a>
+        <a class="btn btn-accent btn-sm btn-mt" href="https://wa.me/6285723803537?text=Halo%20MAGERWEB!" target="_blank" rel="noopener">Mari Bicara <i data-lucide="arrow-up-right"></i></a>
       </div>
     </div>
     <div class="foot-bottom mono">
