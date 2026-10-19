@@ -607,8 +607,8 @@ function initMainThread3D(canvas, isMobile){
   var DUR_MS=2800, TICK=50;
   var step=100/(DUR_MS/TICK);
   var iv=setInterval(function(){
-    p=Math.min(100, p+step*(seen?2.2:1));
     if(num) num.textContent=String(Math.floor(p)).padStart(3,'0');
+    p=Math.min(100, p+step*(seen?2.2:1));
     if(p>=100){ clearInterval(iv); setTimeout(finish,380); }
   },TICK);
   setTimeout(finish,4200); /* failsafe */
