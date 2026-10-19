@@ -62,7 +62,11 @@ section[id]{scroll-margin-top:80px}
 .intro-inner{text-align:left}
 .intro-num{font-size:clamp(3rem,10vw,5.5rem);font-weight:200;letter-spacing:-.02em;line-height:1;
   color:#fff;opacity:.92}
-.intro-rule{width:3.5rem;height:1px;background:rgba(255,255,255,.35);margin:.7rem 0 .55rem}
+.intro-rule{position:relative;width:3.5rem;height:1px;background:rgba(255,255,255,.14);margin:.7rem 0 .55rem;overflow:hidden}
+/* Tahap 1: progress bar 1px — fill terhubung ke progress aktual via scaleX (JS).
+   Putih redup, bukan aksen oranye. Satu-satunya sumber: --introP via inline style. */
+.intro-bar{position:absolute;left:0;top:0;display:block;width:100%;height:1px;
+  background:rgba(255,255,255,.72);transform:scaleX(0);transform-origin:left center}
 .intro-label{font-size:.6rem;letter-spacing:.3em;color:rgba(255,255,255,.55)}
 /* Fase 1 Tahap A: .intro-epoch & .intro-bar dihapus dari HTML (tidak ada di referensi) */
 
