@@ -249,11 +249,12 @@ function initMainThread3D(canvas, isMobile){
   if(!num) return;
   var ticking=false;
   var STAGES=[
-    [0.00,'CH.00 · THE VOID'],[0.10,'CH.01 · THE PROBLEM'],
-    [0.20,'CH.02 · TRANSFORMATION'],[0.30,'CH.03 · TESSERACT'],
-    [0.48,'CH.04 · CASE STUDY'],[0.58,'CH.05 · SERVICES'],
-    [0.70,'CH.06 · PROSES'],[0.80,'CH.07 · ORIGIN'],
-    [0.89,'CH.08 · FAQ'],[0.96,'CH.09 · MULAI']
+    [0.00,'CH.00 · AWAL'],[0.10,'CH.01 · MASALAH'],
+    [0.20,'CH.02 · TRANSFORMASI'],[0.30,'CH.03 · KENAPA'],
+    [0.40,'01 · KARYA'],[0.52,'CH.04 · STUDI KASUS'],
+    [0.62,'CH.05 · LAYANAN'],[0.72,'CH.06 · PROSES'],
+    [0.82,'CH.07 · TENTANG'],[0.90,'CH.08 · FAQ'],
+    [0.96,'CH.09 · MULAI']
   ];
   function update(){
     ticking=false;
