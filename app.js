@@ -583,7 +583,8 @@ function initMainThread3D(canvas, isMobile){
   /* Fase 1 REVISI: counter 000-100 di-overlay kiri-bawah di atas animasi shader.
      Sync ke worker simTime (bukan timer DOM terpisah). Hero SUDAH visible
      di balik counter — tidak ada cut/fade hitam. Di 100: counter fade out. */
-  var num=document.getElementById('introNum'), done=false, heroRevealed=false;
+  var num=document.getElementById('introNum'), bar=document.getElementById('introBar'),
+      done=false, heroRevealed=false;
   function revealHero(){
     if(heroRevealed) return; heroRevealed=true;
     var heroRvs=document.querySelectorAll('.hero .rv');
@@ -605,28 +606,64 @@ function initMainThread3D(canvas, isMobile){
     document.body.classList.remove('loading');
     revealHero(); /* pastikan hero visible */
   }
+  /* Tahap 1: hormati prefers-reduced-motion — selesaikan instan, tanpa animasi counter.
+     (CSS juga menyembunyikan #intro; ini memastikan tidak ada timer yang jalan sia-sia.) */
+  var reduceM=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduceM){
+    if(num) num.textContent='100';
+    if(bar) bar.style.transform='scaleX(1)';
+    finishIntro();
+    return;
+  }
+  /* Tahap 1: SATU state progress (0..1) untuk counter + bar + transisi.
+     - targetP: progress aktual — dari worker simTime (sumber utama), atau timer lokal (fallback).
+     - displayP: nilai yang di-render, diinterpolasi smooth via rAF agar counter tidak melompat
+       (pesan worker ~10Hz = lompatan ~3-4 angka per update tanpa interpolasi).
+     - render(p): SATU-SATUNYA tempat counter & bar di-update — tidak bisa saling mendahului. */
+  var targetP=0, displayP=0, rafId=0, lastTick=0;
+  function render(p){
+    var v=Math.round(p*100);
+    if(num) num.textContent=String(v).padStart(3,'0');
+    if(bar) bar.style.transform='scaleX('+p.toFixed(4)+')';
+    if(v>=70) revealHero(); /* hero visible sebelum counter selesai */
+  }
+  function tick(now){
+    if(done) return;
+    var dt=Math.min(100, now-(lastTick||now)); lastTick=now;
+    /* kejar target dengan time-constant ~120ms: smooth tapi tidak tertinggal jauh */
+    displayP+=(targetP-displayP)*Math.min(1, dt/120);
+    if(targetP>=1 && displayP>0.995){ displayP=1; render(1); setTimeout(finishIntro,250); return; }
+    render(displayP);
+    rafId=requestAnimationFrame(tick);
+  }
+  function kickRaf(){
+    if(!rafId && !done){ lastTick=performance.now(); rafId=requestAnimationFrame(tick); }
+  }
   /* Dipanggil dari worker.onmessage saat terima {type:'intro'}.
      t = worker simTime (detik), dur = durasi intro shader (2.8s).
-     Hero mulai reveal di ~70% agar sudah visible saat counter 100. */
+     Progress = progres render shader yang sebenarnya — bukan timer palsu. */
   window.__onWorkerIntro=function(d){
     if(done) return;
     var t=d.t||0, dur=d.dur||2.8;
-    var v=Math.min(100, Math.floor(t/dur*100));
-    if(num) num.textContent=String(v).padStart(3,'0');
-    if(v>=70) revealHero(); /* hero visible sebelum counter selesai */
-    if(d.done || v>=100){ setTimeout(finishIntro, 250); }
+    targetP=Math.min(1, t/dur);
+    if(d.done) targetP=1;
+    kickRaf();
   };
   /* Fallback: jika worker tidak kirim intro (fallback mode), pakai timer lokal.
-     Juga failsafe: paksa selesai setelah 6 detik. */
-  var lp=0, liv=setInterval(function(){
+     Juga failsafe: paksa selesai setelah 6 detik agar pengguna tidak terjebak. */
+  var liv=setInterval(function(){
     if(done){ clearInterval(liv); return; }
     if(window.__worker3D) return; /* worker aktif — tunggu pesan worker */
-    lp=Math.min(100, lp+2);
-    if(num) num.textContent=String(Math.floor(lp)).padStart(3,'0');
-    if(lp>=70) revealHero();
-    if(lp>=100){ clearInterval(liv); setTimeout(finishIntro, 250); }
+    targetP=Math.min(1, targetP+0.02); /* 50 tick x 56ms ≈ 2.8s */
+    kickRaf();
+    if(targetP>=1) clearInterval(liv);
   }, 56);
-  setTimeout(function(){ if(!done){ clearInterval(liv); finishIntro(); } }, 6000);
+  setTimeout(function(){
+    if(!done){
+      clearInterval(liv); if(rafId) cancelAnimationFrame(rafId);
+      targetP=1; displayP=1; render(1); finishIntro();
+    }
+  }, 6000);
 })();
 
 /* ---------- Clock + date ---------- */
