@@ -209,6 +209,11 @@ function initMainThread3D(canvas, isMobile){
   if(EMBED_MODE){ return; }
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var isMobile = window.innerWidth<640;
+  /* Tahap 2: deteksi perangkat -> quality awal worker.
+     mobile=medium(1); cpu<=4 core=low(0); desktop powerful=high(2). */
+  var initQ=2;
+  if(isMobile) initQ=1;
+  try{ if(navigator.hardwareConcurrency && navigator.hardwareConcurrency<=4) initQ=0; }catch(e){}
   if(reduceMotion || !window.THREE) return;
 
   var journey=0, targetJourney=0, worker=null, useWorker=false;
@@ -223,7 +228,7 @@ function initMainThread3D(canvas, isMobile){
   function initWorker(){
     try{
       if(!window.Worker || !canvas.transferControlToOffscreen) return false;
-      worker=new Worker('worker-3d.js?v=20261019f');
+      worker=new Worker('worker-3d.js?v=20261019g');
       var off=canvas.transferControlToOffscreen();
       var ready=false;
       worker.onmessage=function(e){
@@ -234,7 +239,7 @@ function initMainThread3D(canvas, isMobile){
       worker.onerror=function(){ initFallback(); };
       worker.postMessage({type:'init', canvas:off,
         width:window.innerWidth, height:window.innerHeight,
-        dpr:window.devicePixelRatio||1, isMobile:isMobile}, [off]);
+        dpr:window.devicePixelRatio||1, isMobile:isMobile, quality:initQ}, [off]);
       // Timeout: jika worker tidak ready dalam 5 detik, fallback
       setTimeout(function(){ if(!ready) initFallback(); }, 5000);
       useWorker=true;
