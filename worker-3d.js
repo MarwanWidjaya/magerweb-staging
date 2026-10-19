@@ -1,9 +1,17 @@
 /* worker-3d.js — MagerWeb cinematic journey di Web Worker via OffscreenCanvas.
+   BLACK HOLE: PURE GLSL fragment shader (WebGL2, raw context). NO Three.js.
+     - Satu fullscreen triangle, satu draw call
+     - Simulasi cahaya prosedural ala poggufanz.xyz:
+       Big Bang intro (flash + radial lines) -> Voronoi cosmic web (ungu/pink)
+       -> stars -> black hole forms (disk EMAS-PUTIH TERANG, lensing jelas)
+     - gasColor palette: warm only where bright (cream/gold),
+       dim areas = violet/indigo (NEVER dim orange/brown)
+     - Doppler beaming, photon ring, strong bloom
+   TESSERACT: Three.js bookshelf corridor (0.44-1.00) — unchanged.
    THE JOURNEY (journey 0..1, dari scroll):
-     0.00–0.30  BLACK HOLE  — Gargantua, kamera mendekat, BH membesar & mendominasi
-     0.30–0.44  THE FALL    — warp: FOV punch + star-stretch + white flash (jatuh ke singularitas)
-     0.44–1.00  TESSERACT   — lorong rak buku infinite ala Interstellar/Cooper,
-                              kamera maju pelan & STABIL (no sway = no pusing)
+     0.00-0.30  BLACK HOLE — shader (uApproach 0->1, BH membesar)
+     0.30-0.44  THE FALL   — shader warp (uFall 0->1): streaks + flash
+     0.44-1.00  TESSERACT  — Three.js corridor
    Menerima: {type:'init', canvas, width, height, dpr, isMobile}
              {type:'scroll', journey}
              {type:'resize', width, height}
@@ -12,246 +20,353 @@
 */
 importScripts('https://unpkg.com/three@0.160.0/build/three.min.js');
 
+/* ==================== PURE GLSL BLACK HOLE ==================== */
+var BH_VERT_SRC = [
+'#version 300 es',
+'layout(location=0) in vec2 aPos;',
+'void main(){ gl_Position=vec4(aPos,0.0,1.0); }'
+].join('\n');
+
+var BH_FRAG_SRC = [
+'#version 300 es',
+'precision highp float;',
+'uniform vec2 uRes;',
+'uniform float uTime;',
+'uniform float uApproach;',
+'uniform float uFall;',
+'uniform vec2 uCenter;',
+'uniform float uHorizon;',
+'out vec4 fragColor;',
+'',
+'float hash11(float p){ p=fract(p*0.1031); p*=p+33.33; p*=p+p; return fract(p); }',
+'float hash12(vec2 p){ vec3 p3=fract(vec3(p.xyx)*0.1031); p3+=dot(p3,p3.yzx+33.33); return fract((p3.x+p3.y)*p3.z); }',
+'vec2 hash22(vec2 p){ vec3 p3=fract(vec3(p.xyx)*vec3(0.1031,0.1030,0.0973)); p3+=dot(p3,p3.yzx+33.33); return fract((p3.xx+p3.yz)*p3.zy); }',
+'float vnoise(vec2 p){',
+'  vec2 i=floor(p); vec2 f=fract(p);',
+'  vec2 u=f*f*(3.0-2.0*f);',
+'  float a=hash12(i); float b=hash12(i+vec2(1.0,0.0));',
+'  float c=hash12(i+vec2(0.0,1.0)); float d=hash12(i+vec2(1.0,1.0));',
+'  return mix(mix(a,b,u.x),mix(c,d,u.x),u.y);',
+'}',
+'float fbm(vec2 p){',
+'  float v=0.0; float a=0.5;',
+'  mat2 r=mat2(0.8,0.6,-0.6,0.8);',
+'  for(int i=0;i<5;i++){ v+=a*vnoise(p); p=r*p*2.03; a*=0.5; }',
+'  return v;',
+'}',
+'vec2 voronoi(vec2 p){',
+'  vec2 ip=floor(p); vec2 fp=fract(p);',
+'  float f1=8.0; float f2=8.0;',
+'  for(int j=-1;j<=1;j++){',
+'    for(int i=-1;i<=1;i++){',
+'      vec2 g=vec2(float(i),float(j));',
+'      vec2 o=hash22(ip+g);',
+'      vec2 r=g+o-fp;',
+'      float d=dot(r,r);',
+'      if(d<f1){ f2=f1; f1=d; } else if(d<f2){ f2=d; }',
+'    }',
+'  }',
+'  return sqrt(vec2(f1,f2));',
+'}',
+'/* gasColor: warm only where bright. Dim orange would read as brown,',
+'   so dim areas go violet/indigo. */',
+'vec3 gasColor(float g){',
+'  vec3 cream=vec3(1.00,0.93,0.80);',
+'  vec3 gold =vec3(1.00,0.76,0.42);',
+'  vec3 amber=vec3(0.82,0.46,0.22);',
+'  vec3 viol =vec3(0.40,0.16,0.72);',
+'  vec3 indi =vec3(0.12,0.07,0.36);',
+'  vec3 c=mix(indi,viol,smoothstep(0.00,0.34,g));',
+'  c=mix(c,amber,smoothstep(0.34,0.60,g));',
+'  c=mix(c,gold,smoothstep(0.60,0.84,g));',
+'  c=mix(c,cream,smoothstep(0.84,1.00,g));',
+'  return c;',
+'}',
+'void main(){',
+'  vec2 uv=gl_FragCoord.xy/uRes;',
+'  float aspect=uRes.x/uRes.y;',
+'  vec2 p=(uv-0.5)*vec2(aspect,1.0);',
+'  float t=uTime;',
+'  vec3 col=vec3(0.004,0.003,0.010);',
+'',
+'  /* ---------- INTRO: Big Bang (time-driven) ---------- */',
+'  float bt=(t-0.45)*5.0;',
+'  float bangFlash=exp(-bt*bt);',
+'  float radialAmt=smoothstep(0.30,0.45,t)*(1.0-smoothstep(0.75,1.15,t));',
+'  float webAmt=smoothstep(0.65,0.95,t)*(1.0-smoothstep(1.35,1.85,t));',
+'  float starsAmt=smoothstep(1.05,1.55,t);',
+'  float bhAmt=smoothstep(1.65,2.65,t);',
+'  col+=vec3(1.0,0.98,0.94)*bangFlash*2.4;',
+'  {',
+'    vec2 d0=p-uCenter;',
+'    float r0=length(d0);',
+'    float a0=atan(d0.y,d0.x);',
+'    float s=0.5+0.5*sin(a0*36.0+fbm(p*3.0+t*0.7)*5.0);',
+'    float rays=s*s; rays*=rays; rays*=s;',
+'    col+=vec3(1.0,0.88,0.70)*rays*exp(-r0*2.4)*radialAmt*1.5;',
+'  }',
+'  {',
+'    vec2 vv=voronoi(p*6.0+vec2(t*0.04,-t*0.025));',
+'    float edge=1.0-smoothstep(0.0,0.10,vv.y-vv.x);',
+'    vec3 wc=mix(vec3(0.42,0.14,0.78),vec3(0.88,0.28,0.58),fbm(p*4.0+3.7));',
+'    col+=wc*edge*webAmt*0.85;',
+'  }',
+'  {',
+'    vec2 sp=p*80.0;',
+'    vec2 cell=floor(sp);',
+'    vec2 fpos=fract(sp)-0.5;',
+'    vec2 spos=(hash22(cell)-0.5)*0.7;',
+'    vec2 so=fpos-spos;',
+'    float sd=length(so);',
+'    float h=hash12(cell);',
+'    float on=step(0.90,h);',
+'    float tw=0.65+0.35*sin(t*2.5+h*50.0);',
+'    float s=(1.0-smoothstep(0.01,0.09,sd))*on*tw;',
+'    float fl=step(0.986,h);',
+'    float cross=(exp(-abs(so.y)*36.0)+exp(-abs(so.x)*36.0))*fl*0.4;',
+'    col+=vec3(0.82,0.88,1.0)*(s+cross)*starsAmt;',
+'  }',
+'',
+'  /* ---------- BLACK HOLE ---------- */',
+'  float fz=1.0+uFall*2.2;',
+'  float az=1.0/(1.0+uApproach*0.9);',
+'  vec2 d=(p-uCenter)*az/fz;',
+'  float r=length(d);',
+'  float ang=atan(d.y,d.x);',
+'  float H=uHorizon*(1.0+0.008*sin(t*0.9));',
+'  vec3 bh=vec3(0.0);',
+'',
+'  /* Lensed arcs: far side of disk bent over/under by gravity */',
+'  {',
+'    float arx=H*2.30; float ary=H*1.25;',
+'    vec2 ep=vec2(d.x/arx,d.y/ary);',
+'    float er=length(ep);',
+'    float q=(er-1.0)/0.085;',
+'    float band=exp(-q*q);',
+'    float sm=sin(atan(ep.y,ep.x));',
+'    float upm=smoothstep(0.06,0.60,sm);',
+'    float heat=pow(clamp(upm,0.0,1.0),1.4);',
+'    vec3 ac=gasColor(0.55+0.40*heat);',
+'    float at=fbm(vec2(atan(ep.y,ep.x)*2.0,er*4.0-t*0.4));',
+'    bh+=ac*band*upm*(1.55+0.50*at)*bhAmt;',
+'  }',
+'  {',
+'    float arx=H*2.05; float ary=H*1.10;',
+'    vec2 ep=vec2(d.x/arx,d.y/ary);',
+'    float er=length(ep);',
+'    float q=(er-1.0)/0.10;',
+'    float band=exp(-q*q);',
+'    float sm=sin(atan(ep.y,ep.x));',
+'    float dnm=smoothstep(-0.06,-0.60,sm);',
+'    float heat=pow(clamp(dnm,0.0,1.0),1.5);',
+'    vec3 ac=gasColor(0.28+0.30*heat);',
+'    bh+=ac*band*dnm*0.80*bhAmt;',
+'  }',
+'',
+'  /* Direct disk: edge-on band, GOLD-WHITE, doppler beaming */',
+'  {',
+'    float diskIn=H*1.10; float diskOut=H*3.30;',
+'    float inM=smoothstep(diskIn,diskIn*1.18,r);',
+'    float outM=1.0-smoothstep(diskOut*0.62,diskOut,r);',
+'    float thick=0.030+0.055*smoothstep(diskIn,diskOut,r);',
+'    float bq=abs(d.y)/max(thick,1e-4);',
+'    float band=exp(-pow(bq,1.7));',
+'    float rad=1.0-clamp((r-diskIn)/(diskOut-diskIn),0.0,1.0);',
+'    float heat=pow(clamp(rad,0.0,1.0),1.5);',
+'    float beam=1.0-0.58*cos(ang);',
+'    float turb=fbm(vec2(ang*2.5,r*7.0-t*1.1));',
+'    float streak=0.85+0.30*sin(ang*22.0+r*26.0-t*2.2);',
+'    float db=band*inM*outM*(0.30+0.70*heat)*beam*(0.70+0.60*turb)*streak;',
+'    vec3 dc=gasColor(clamp(0.18+heat*0.72*beam,0.0,1.0));',
+'    bh+=dc*db*3.0*bhAmt;',
+'  }',
+'',
+'  /* Bloom: STRONG */',
+'  {',
+'    float q1=r/(H*4.2); float q2=r/(H*1.9);',
+'    bh+=vec3(1.0,0.80,0.52)*exp(-q1*q1)*0.50*bhAmt;',
+'    bh+=vec3(1.0,0.86,0.62)*exp(-q2*q2)*0.38*bhAmt;',
+'  }',
+'',
+'  /* Event horizon: black, sharp */',
+'  float hor=(1.0-smoothstep(H*0.985,H*1.015,r))*bhAmt;',
+'  bh*=1.0-hor;',
+'',
+'  /* Photon ring: thin, brilliant */',
+'  {',
+'    float q=(r-H*1.03)/(H*0.020);',
+'    bh+=vec3(1.0,0.96,0.88)*exp(-q*q)*2.4*bhAmt*(1.0-hor);',
+'  }',
+'  col+=bh;',
+'',
+'  /* ---------- THE FALL: warp streaks + flash ---------- */',
+'  float uF=clamp(uFall,0.0,1.0);',
+'  if(uF>0.001){',
+'    float sa=atan(d.y,d.x);',
+'    float cells=floor((sa+3.14159)*12.0);',
+'    float sh=hash11(cells*1.7+3.0);',
+'    float wstreak=smoothstep(0.72,1.0,sh);',
+'    float rr=clamp(r/(H*4.0),0.0,1.0);',
+'    col+=vec3(0.55,0.75,1.0)*wstreak*(1.0-rr)*uF*1.3;',
+'    float flash=sin(uF*3.14159);',
+'    col=mix(col,vec3(1.0,0.97,0.92),clamp(flash,0.0,1.0)*0.70);',
+'  }',
+'',
+'  /* ---------- tonemap ---------- */',
+'  col=vec3(1.0)-exp(-col*1.55);',
+'  col=pow(col,vec3(0.92));',
+'  fragColor=vec4(col,1.0);',
+'}'
+].join('\n');
+
+/* ==================== RAW WebGL2 ENGINE ==================== */
+var gl=null, bhProg=null, bhVAO=null;
+var uResL=null, uTimeL=null, uApproachL=null, uFallL=null, uCenterL=null, uHorizonL=null;
+var canvasEl=null, bufW=0, bufH=0, aspectNow=1.6;
+var glBHReady=false;
+
+function bhCompile(type, src){
+  var s=gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)){
+    var log=gl.getShaderInfoLog(s);
+    gl.deleteShader(s);
+    throw new Error('BH shader compile failed: '+log);
+  }
+  return s;
+}
+
+function initBHGL(){
+  var vs=bhCompile(gl.VERTEX_SHADER, BH_VERT_SRC);
+  var fs=bhCompile(gl.FRAGMENT_SHADER, BH_FRAG_SRC);
+  bhProg=gl.createProgram();
+  gl.attachShader(bhProg, vs);
+  gl.attachShader(bhProg, fs);
+  gl.linkProgram(bhProg);
+  if(!gl.getProgramParameter(bhProg, gl.LINK_STATUS)){
+    throw new Error('BH program link failed: '+gl.getProgramInfoLog(bhProg));
+  }
+  uResL=gl.getUniformLocation(bhProg,'uRes');
+  uTimeL=gl.getUniformLocation(bhProg,'uTime');
+  uApproachL=gl.getUniformLocation(bhProg,'uApproach');
+  uFallL=gl.getUniformLocation(bhProg,'uFall');
+  uCenterL=gl.getUniformLocation(bhProg,'uCenter');
+  uHorizonL=gl.getUniformLocation(bhProg,'uHorizon');
+  bhVAO=gl.createVertexArray();
+  gl.bindVertexArray(bhVAO);
+  var vbo=gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.bindVertexArray(null);
+  gl.bindBuffer(gl.ARRAY_BUFFER, null);
+}
+
+function renderBH(time, approach, fall, cx, cy, horizon){
+  var W=canvasEl.width, H=canvasEl.height;
+  gl.viewport(0, 0, W, H);
+  gl.disable(gl.BLEND);
+  gl.disable(gl.DEPTH_TEST);
+  gl.disable(gl.SCISSOR_TEST);
+  gl.disable(gl.STENCIL_TEST);
+  gl.useProgram(bhProg);
+  gl.uniform2f(uResL, W, H);
+  gl.uniform1f(uTimeL, time);
+  gl.uniform1f(uApproachL, approach);
+  gl.uniform1f(uFallL, fall);
+  gl.uniform2f(uCenterL, cx, cy);
+  gl.uniform1f(uHorizonL, horizon);
+  gl.bindVertexArray(bhVAO);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.bindVertexArray(null);
+  gl.useProgram(null);
+}
+
+/* Reset GL state sebelum Three.js render (konteks dipakai bersama). */
+function glResetForThree(){
+  gl.bindVertexArray(null);
+  gl.useProgram(null);
+  gl.bindBuffer(gl.ARRAY_BUFFER, null);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
+  gl.disable(gl.BLEND);
+  gl.enable(gl.DEPTH_TEST);
+  gl.depthMask(true);
+  gl.depthFunc(gl.LESS);
+  gl.colorMask(true,true,true,true);
+  gl.clearColor(0,0,0,1);
+}
+
+/* ==================== 2D FALLBACK (tanpa WebGL2) ==================== */
+var fallback2D=false, ctx2d=null, fbStars=null;
+function initFallback2D(){
+  try{ ctx2d=canvasEl.getContext('2d'); }catch(e){ ctx2d=null; }
+  if(!ctx2d) return false;
+  fbStars=[];
+  for(var i=0;i<220;i++) fbStars.push([Math.random(),Math.random(),Math.random()]);
+  fallback2D=true;
+  return true;
+}
+function renderFallback2D(time){
+  var w=canvasEl.width, h=canvasEl.height;
+  ctx2d.fillStyle='#030308';
+  ctx2d.fillRect(0,0,w,h);
+  var i, s;
+  for(i=0;i<fbStars.length;i++){
+    s=fbStars[i];
+    var tw=0.5+0.5*Math.sin(time*2+s[2]*20);
+    ctx2d.fillStyle='rgba(200,210,255,'+(0.25+0.55*tw*s[2]).toFixed(3)+')';
+    ctx2d.fillRect(s[0]*w, s[1]*h, 2, 2);
+  }
+  var cx=w*0.68, cy=h*0.45, R=Math.min(w,h)*0.15;
+  var pulse=1+0.012*Math.sin(time*0.9);
+  R*=pulse;
+  var g=ctx2d.createRadialGradient(cx,cy,R,cx,cy,R*3.4);
+  g.addColorStop(0,'rgba(255,196,120,0.55)');
+  g.addColorStop(0.5,'rgba(210,130,70,0.20)');
+  g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx2d.fillStyle=g;
+  ctx2d.fillRect(cx-R*3.4,cy-R*3.4,R*6.8,R*6.8);
+  ctx2d.save();
+  ctx2d.translate(cx,cy);
+  ctx2d.scale(1,0.17);
+  var dg=ctx2d.createRadialGradient(0,0,R*1.05,0,0,R*3.2);
+  dg.addColorStop(0,'rgba(255,242,214,0.95)');
+  dg.addColorStop(0.35,'rgba(255,196,110,0.60)');
+  dg.addColorStop(0.7,'rgba(190,120,80,0.25)');
+  dg.addColorStop(1,'rgba(90,50,120,0)');
+  ctx2d.fillStyle=dg;
+  ctx2d.beginPath(); ctx2d.arc(0,0,R*3.2,0,6.3); ctx2d.fill();
+  ctx2d.restore();
+  ctx2d.fillStyle='#000000';
+  ctx2d.beginPath(); ctx2d.arc(cx,cy,R,0,6.3); ctx2d.fill();
+  ctx2d.strokeStyle='rgba(255,250,235,0.92)';
+  ctx2d.lineWidth=Math.max(2,w*0.0016);
+  ctx2d.beginPath(); ctx2d.arc(cx,cy,R*1.045,0,6.3); ctx2d.stroke();
+}
+
+/* ==================== Three.js: TESSERACT ONLY ==================== */
 var renderer=null, scene=null, camera=null;
-var bhGroup=null, disk=null, glowInner=null;
-var lensUp=null, lensDown=null, photonRing=null;
-var tessGroup=null, flashPlane=null;
-var stars=null, starPos=null, starBase=null, STAR_N=0;
+var tessGroup=null;
 var journey=0, targetJourney=0;
 var isMobile=false, running=true, rafId=0;
 var baseFov=62;
+var simTime=0, lastT=-1;
 
-function buildScene(canvas, W, H, DPR, mobile){
-  isMobile=mobile;
-  renderer=new THREE.WebGLRenderer({canvas:canvas, alpha:true, antialias:!mobile});
-  renderer.setPixelRatio(Math.min(DPR, mobile?1.5:2));
-  renderer.setSize(W,H,false);
+function buildTesseract(){
   scene=new THREE.Scene();
   scene.fog=new THREE.FogExp2(0x060503,0.011);
-  camera=new THREE.PerspectiveCamera(baseFov,W/H,.1,900);
+  var W=canvasEl.width, H=canvasEl.height;
+  camera=new THREE.PerspectiveCamera(baseFov, W/Math.max(1,H), .1, 900);
 
-  /* ================= WORLD 0: BLACK HOLE (Gargantua) ================= */
-  /* v2 (2026-10-19): perbandingan langsung vs poggufanz.xyz
-     1. UKURAN 1.6-1.9x lebih besar — dominan, overlap teks
-     2. DISK MELENGKUNG (lensing): sisi jauh menekuk naik di atas bayangan
-     3. WARNA lebih terang: putih-kuning lembut → emas lembut (volumetrik)
-     4. SATU orbit ring saja (hapus yang ganda)
-     5. LENSING ARCS tipis konsentris (hapus halo perunggu tebal)
-     6. VOLUMETRIK: radial glow sprite + soft falloff, tanpa edge keras */
-  bhGroup=new THREE.Group();
-
-  // Event horizon — hitam pekat sempurna (diperbesar 3.2 → 4.0)
-  var bhSphere=new THREE.Mesh(
-    new THREE.SphereGeometry(4.0,64,64),
-    new THREE.MeshBasicMaterial({color:0x000000})
-  );
-  bhGroup.add(bhSphere);
-
-  /* ============ ACCRETION DISK — custom shader ala Gargantua ============
-     v2: - Geometri MELENGKUNG: sisi jauh (belakang BH) menekuk NAIK,
-           meniru gravitational lensing di Interstellar (bukan cakram datar!)
-         - Warna LEBIH TERANG & LEMBUT: putih-kuning → emas lembut
-         - Doppler beaming dilembutkan (0.85 → 0.55): volumetrik, bukan flat
-         - Alpha falloff LEBIH LEMBUT di tepi luar */
-  var DISK_IN=4.45, DISK_OUT=12.2;
-  var diskUniforms={
-    uTime:{value:0},
-    uInnerR:{value:DISK_IN},
-    uOuterR:{value:DISK_OUT}
-  };
-  // Geometri disk melengkung: sisi jauh menekuk ke atas (lensing)
-  var diskGeo=new THREE.RingGeometry(DISK_IN,DISK_OUT,180,20);
-  (function curveDisk(){
-    var dp=diskGeo.attributes.position;
-    for(var i=0;i<dp.count;i++){
-      var vy=dp.getY(i);
-      if(vy>0){
-        // sisi jauh (local +Y → world -Z setelah rotasi): angkat ke atas
-        var f=vy/DISK_OUT;
-        dp.setZ(i, Math.pow(f,2.2)*7.5);
-      }
-    }
-    diskGeo.computeVertexNormals();
-  })();
-  var diskMat=new THREE.ShaderMaterial({
-    uniforms:diskUniforms,
-    transparent:true,
-    side:THREE.DoubleSide,
-    depthWrite:false,
-    vertexShader:[
-      'varying vec2 vPolar;',
-      'uniform float uInnerR;',
-      'uniform float uOuterR;',
-      'void main(){',
-      '  vec3 pos=position;',
-      '  float r=length(pos.xy);',
-      '  float radial=clamp((r-uInnerR)/(uOuterR-uInnerR),0.0,1.0);',
-      '  float angular=atan(pos.y,pos.x)/6.2831853+0.5;',
-      '  vPolar=vec2(radial,angular);',
-      '  gl_Position=projectionMatrix*modelViewMatrix*vec4(pos,1.0);',
-      '}'
-    ].join('\n'),
-    fragmentShader:[
-      'varying vec2 vPolar;',
-      'uniform float uTime;',
-      'vec3 diskColor(float r){',
-      // gasColor ala poggufanz: "warm only where bright — a dim orange would read as brown"
-      // gelap: indigo → sedang: violet → terang: rose → paling terang: cream-white
-      '  vec3 core=vec3(1.0,0.90,0.78);',   // cream-white: paling terang
-      '  vec3 rose=vec3(1.0,0.26,0.52);',   // rose: terang
-      '  vec3 viol=vec3(0.44,0.16,0.80);',  // violet: sedang
-      '  vec3 indi=vec3(0.12,0.08,0.42);',  // indigo: gelap
-      '  vec3 c=mix(core,rose,smoothstep(0.0,0.35,r));',
-      '  c=mix(c,viol,smoothstep(0.35,0.70,r));',
-      '  c=mix(c,indi,smoothstep(0.70,1.0,r));',
-      '  return c;',
-      '}',
-      'void main(){',
-      '  float r=vPolar.x;',
-      '  float theta=vPolar.y*6.2831853;',
-      '  vec3 col=diskColor(r);',
-      // Doppler beaming DILEMBUTKAN (0.85 → 0.55): volumetrik
-      '  float side=cos(theta);',
-      '  float beam=1.0+side*0.55;',
-      '  col*=beam;',
-      '  col.b+=max(0.0,side)*0.12*(1.0-r);',
-      '  col.r+=max(0.0,-side)*0.06*(1.0-r);',
-      // Inner edge menyala (material jatuh) — dilembutkan
-      '  float innerGlow=pow(1.0-r,6.0)*1.8;',
-      '  col+=vec3(1.0,0.98,0.92)*innerGlow;',
-      // Turbulensi animasi — pusaran gas yang hidup
-      '  float turb=0.82',
-      '    +0.18*sin(theta*3.0+uTime*0.7+r*14.0)*cos(theta*5.0-uTime*0.45+r*9.0)',
-      '    +0.08*sin(theta*9.0+uTime*1.2+r*22.0);',
-      '  col*=turb;',
-      // Streaks radial — aliran akresi ke dalam
-      '  float streak=0.88+0.12*sin(theta*28.0+r*36.0-uTime*2.4);',
-      '  col*=streak;',
-      // Alpha: falloff SANGAT LEMBUT (volumetrik, tanpa edge keras)
-      '  float alpha=0.95*(1.0-smoothstep(0.55,1.0,r));',
-      '  alpha*=0.90+0.10*turb;',
-      '  gl_FragColor=vec4(col,alpha);',
-      '}'
-    ].join('\n')
-  });
-  disk=new THREE.Mesh(diskGeo, diskMat);
-  disk.rotation.x=-Math.PI/2.08; // nyaris edge-on = disk tipis ala Gargantua
-  bhGroup.add(disk);
-  bhGroup.userData.diskUniforms=diskUniforms;
-
-  // Inner glow — cincin terang di tepi event horizon (dilembutkan)
-  glowInner=new THREE.Mesh(
-    new THREE.RingGeometry(4.05,5.15,96),
-    new THREE.MeshBasicMaterial({color:0xfff2d0, transparent:true, opacity:.42,
-      side:THREE.DoubleSide, blending:THREE.AdditiveBlending, depthWrite:false})
-  );
-  glowInner.rotation.x=-Math.PI/2.08;
-  bhGroup.add(glowInner);
-
-  /* v2: glowOuter (halo perunggu TEBAL) DIHAPUS — diganti volumetric glow
-     lembut + lensing arcs tipis. Tidak ada lagi "pita halo dekoratif". */
-
-  /* --- GARGANTUA LENSING ARCS: busur-busur TIPIS konsentris ---
-     v2: tube DITIPISKAN drastis, ditambah 1 busur ekstra.
-     Ini citra cakram yang terlensakan — ciri khas Interstellar. */
-  function lensedArc(radius, tube, yPos, colorHot, colorDim, opacity, flip){
-    var geo=new THREE.TorusGeometry(radius,tube,16,180,Math.PI);
-    var p=geo.attributes.position, n=p.count;
-    var cols=new Float32Array(n*3);
-    var cH=new THREE.Color(colorHot), cD=new THREE.Color(colorDim), tc=new THREE.Color();
-    for(var i=0;i<n;i++){
-      var x=p.getX(i);
-      var f=Math.max(0,1-Math.abs(x)/(radius*1.05));
-      f=Math.pow(f,1.6);
-      tc.copy(cD).lerp(cH,f);
-      cols[i*3]=tc.r; cols[i*3+1]=tc.g; cols[i*3+2]=tc.b;
-    }
-    geo.setAttribute('color',new THREE.BufferAttribute(cols,3));
-    var m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({
-      vertexColors:true, transparent:true, opacity:opacity,
-      blending:THREE.AdditiveBlending, depthWrite:false}));
-    if(flip) m.rotation.z=Math.PI;
-    m.position.y=yPos;
-    return m;
-  }
-
-  // Photon ring — SANGAT TIPIS, MENYILAUKAN, tepat di tepi event horizon
-  photonRing=new THREE.Mesh(
-    new THREE.RingGeometry(4.08,4.22,180),
-    new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:.95,
-      side:THREE.DoubleSide, blending:THREE.AdditiveBlending, depthWrite:false})
-  );
-  photonRing.rotation.x=-Math.PI/2.08;
-  bhGroup.add(photonRing);
-
-  // Upper lensed arc 1 — busur TIPIS terang (gasColor: cream → violet, bukan coklat)
-  lensUp=lensedArc(7.1,.30,2.9,0xfff4d8,0x7a4a9a,.9,false);
-  bhGroup.add(lensUp);
-  // Upper lensed arc 2 — busur ekstra LEBIH TIPIS & redup (konsentris)
-  var lensUp2=lensedArc(8.4,.18,3.8,0xffe8c0,0x5a3a8a,.55,false);
-  bhGroup.add(lensUp2);
-  bhGroup.userData.lensUp2=lensUp2;
-
-  // Lower lensed arc — busur TIPIS redup (rose → indigo)
-  lensDown=lensedArc(6.7,.24,-2.35,0xff8a6a,0x3a2a6a,.4,true);
-  bhGroup.add(lensDown);
-
-  // Back glow — popler di belakang BH agar silhouette tegas (indigo gelap)
-  var backGlow=new THREE.Mesh(
-    new THREE.CircleGeometry(9.4,48),
-    new THREE.MeshBasicMaterial({color:0x1a1030, transparent:true, opacity:.45,
-      blending:THREE.AdditiveBlending, depthWrite:false})
-  );
-  backGlow.position.z=-2.5;
-  bhGroup.add(backGlow);
-
-  /* --- VOLUMETRIC GLOW: sprite radial-gradient lembut ---
-     v2: cahaya volumetrik sinematik (bukan edge keras).
-     Dibuat via OffscreenCanvas (tersedia di worker). */
-  (function addVolumetricGlow(){
-    try{
-      var gc=new OffscreenCanvas(256,256);
-      var g=gc.getContext('2d');
-      var grad=g.createRadialGradient(128,128,0,128,128,128);
-      grad.addColorStop(0,'rgba(255,214,150,0.55)');
-      grad.addColorStop(0.35,'rgba(255,180,100,0.22)');
-      grad.addColorStop(0.7,'rgba(255,150,70,0.07)');
-      grad.addColorStop(1,'rgba(255,140,60,0)');
-      g.fillStyle=grad;
-      g.fillRect(0,0,256,256);
-      var glowTex=new THREE.CanvasTexture(gc);
-      var volGlow=new THREE.Mesh(
-        new THREE.PlaneGeometry(34,34),
-        new THREE.MeshBasicMaterial({map:glowTex, transparent:true,
-          blending:THREE.AdditiveBlending, depthWrite:false})
-      );
-      volGlow.position.z=-1.2;
-      bhGroup.add(volGlow);
-      bhGroup.userData.volGlow=volGlow;
-    }catch(e){ /* glow opsional — abaikan jika gagal */ }
-  })();
-
-  // Orbit ring — SATU SAJA, tipis, SANGAT BESAR, dominan (ala poggufanz)
-  // v2: tidak ada lagi ring ganda/konsentris samar
-  var orbitRing=new THREE.Mesh(
-    new THREE.RingGeometry(14.8,15.02,160),
-    new THREE.MeshBasicMaterial({color:0xa8a8b2, transparent:true, opacity:.38,
-      side:THREE.DoubleSide, depthWrite:false})
-  );
-  bhGroup.add(orbitRing);
-  bhGroup.userData.orbit=orbitRing;
-
-  scene.add(bhGroup);
-
-  /* ================= WORLD 2: TESSERACT (Cooper) ================= */
   tessGroup=new THREE.Group();
 
-  // Pencahayaan DRAMATIS ala Interstellar — hangat kayu, megah, dalam
-  // Ambient lebih rendah = kontras lebih kuat, sorotan lebih teatrikal
   tessGroup.add(new THREE.AmbientLight(0x8a6a48,0.85));
   var key=new THREE.DirectionalLight(0xffd9a0,1.8);
   key.position.set(12,18,8); tessGroup.add(key);
-  // Sorotan hangat berlapis — kedalaman lorong berasa
   var warmA=new THREE.PointLight(0xff9a50,2.4,150);
   warmA.position.set(-10,4,-220); tessGroup.add(warmA);
   var warmB=new THREE.PointLight(0xffb060,2.0,150);
@@ -260,12 +375,9 @@ function buildScene(canvas, W, H, DPR, mobile){
   warmC.position.set(0,6,-420); tessGroup.add(warmC);
   var coolRim=new THREE.PointLight(0x5a7aff,.6,130);
   coolRim.position.set(0,10,-480); tessGroup.add(coolRim);
-  // Cahaya "ilahi" dari ujung lorong — tujuan perjalanan Cooper
   var divine=new THREE.PointLight(0xffc080,1.2,200);
   divine.position.set(0,0,-600); tessGroup.add(divine);
 
-  // Lorong rak buku: dari z=-190 sampai z=-620, rak di kiri/kanan/atas/bawah.
-  // Tengah lorong KOSONG (jalur kamera) — Cooper terbang di tengah tesseract.
   var woodMat=new THREE.MeshStandardMaterial({color:0x9a6535, roughness:.68, metalness:.05});
   var woodDark=new THREE.MeshStandardMaterial({color:0x6e4525, roughness:.75, metalness:.04});
   var bookColors=[0x8a3a2a,0x2a5a8a,0x3a6a3a,0xd4a95a,0x5a3a6a,0xb56a3a,0x2a3a5a,0x9a2a2a,0xc9b458,0x4a7a6a];
@@ -274,14 +386,12 @@ function buildScene(canvas, W, H, DPR, mobile){
   var bookGeo=new THREE.BoxGeometry(.26,.95,.85);
   var dummy=new THREE.Object3D(), col=new THREE.Color();
 
-  var shelfMats=[], bookMats=[];
   var shelfMesh=new THREE.InstancedMesh(shelfGeo,woodMat,400);
   var frameMesh=new THREE.InstancedMesh(frameGeo,woodDark,400);
   var bookMesh=new THREE.InstancedMesh(bookGeo,
     new THREE.MeshStandardMaterial({color:0xffffff,roughness:.82}),2400);
   var si=0,fi=0,bi=0;
 
-  // Rak di 4 sisi lorong: kiri (x=-7), kanan (x=+7), atas (y=+7), bawah (y=-7)
   var z;
   for(z=-190; z>=-620; z-=14){
     var sides=[
@@ -298,11 +408,9 @@ function buildScene(canvas, W, H, DPR, mobile){
         else { dummy.position.set(off, s.y, z); }
         dummy.updateMatrix();
         if(si<400) shelfMesh.setMatrixAt(si++,dummy.matrix);
-        // frame vertikal di ujung rak
         dummy.position.x+=(sd===0?2.2:sd===1?-2.2:0);
         dummy.updateMatrix();
         if(fi<400) frameMesh.setMatrixAt(fi++,dummy.matrix);
-        // buku-buku di atas tiap papan rak
         for(var b=0;b<8;b++){
           if(Math.random()<.18) continue;
           var bx=(sd<2)? s.x : off-1.7+b*(3.4/7);
@@ -327,7 +435,6 @@ function buildScene(canvas, W, H, DPR, mobile){
   if(bookMesh.instanceColor) bookMesh.instanceColor.needsUpdate=true;
   tessGroup.add(shelfMesh); tessGroup.add(frameMesh); tessGroup.add(bookMesh);
 
-  // Cahaya hangat di ujung lorong — "tujuan" perjalanan
   var destGlow=new THREE.Mesh(
     new THREE.CircleGeometry(26,32),
     new THREE.MeshBasicMaterial({color:0xff9a40, transparent:true, opacity:.32,
@@ -336,7 +443,6 @@ function buildScene(canvas, W, H, DPR, mobile){
   destGlow.position.set(0,0,-640);
   tessGroup.add(destGlow);
 
-  // Debu melayang — atmosfer sinematik ala Interstellar (cahaya menembus debu)
   var DUST_N=isMobile?120:300;
   var dustPos=new Float32Array(DUST_N*3);
   for(var di=0;di<DUST_N;di++){
@@ -354,119 +460,96 @@ function buildScene(canvas, W, H, DPR, mobile){
   tessGroup.userData.dust=dust;
   tessGroup.userData.dustN=DUST_N;
 
-  tessGroup.visible=false;
+  tessGroup.visible=true;
   scene.add(tessGroup);
+}
 
-  /* ================= STARFIELD (untuk fase BLACK HOLE + THE FALL) ================= */
-  STAR_N=isMobile?700:1600;
-  starPos=new Float32Array(STAR_N*3);
-  starBase=new Float32Array(STAR_N*3);
-  for(var i2=0;i2<STAR_N;i2++){
-    starBase[i2*3]=(Math.random()-.5)*420;
-    starBase[i2*3+1]=(Math.random()-.5)*420;
-    starBase[i2*3+2]=40-Math.random()*480;
+function setSize(W,H,DPR){
+  var dpr=Math.min(DPR||1, isMobile?1.5:2);
+  aspectNow=W/Math.max(1,H);
+  if(renderer){
+    renderer.setPixelRatio(dpr);
+    renderer.setSize(W,H,false);
+    bufW=canvasEl.width; bufH=canvasEl.height;
+    if(camera){ camera.aspect=W/H; camera.updateProjectionMatrix(); }
+  }else{
+    bufW=Math.max(2,Math.round(W*dpr));
+    bufH=Math.max(2,Math.round(H*dpr));
+    canvasEl.width=bufW; canvasEl.height=bufH;
   }
-  starPos.set(starBase);
-  var sg=new THREE.BufferGeometry();
-  sg.setAttribute('position',new THREE.BufferAttribute(starPos,3));
-  stars=new THREE.Points(sg,new THREE.PointsMaterial({
-    color:0xcfd8ff,size:.75,transparent:true,opacity:.85}));
-  scene.add(stars);
+}
 
-  /* ================= FLASH PLANE (THE FALL) ================= */
-  flashPlane=new THREE.Mesh(
-    new THREE.PlaneGeometry(60,60),
-    new THREE.MeshBasicMaterial({color:0xfff4e0, transparent:true, opacity:0,
-      blending:THREE.AdditiveBlending, depthWrite:false})
-  );
-  flashPlane.visible=false;
-  scene.add(flashPlane);
+function buildScene(canvas, W, H, DPR, mobile){
+  canvasEl=canvas;
+  isMobile=mobile;
+  try{
+    gl=canvas.getContext('webgl2',{antialias:false,alpha:false,desynchronized:true,powerPreference:'high-performance'});
+  }catch(e){ gl=null; }
+  if(gl){
+    try{
+      initBHGL();
+      glBHReady=true;
+    }catch(e){
+      postMessage({type:'error', msg:'BH-GLSL: '+(e&&e.message||e)});
+      return false;
+    }
+    try{
+      renderer=new THREE.WebGLRenderer({canvas:canvas, context:gl, antialias:false, alpha:false});
+    }catch(e){
+      postMessage({type:'error', msg:'THREE: '+(e&&e.message||e)});
+      return false;
+    }
+    buildTesseract();
+  }else{
+    if(!initFallback2D()){
+      postMessage({type:'error', msg:'WebGL2 dan 2D tidak tersedia'});
+      return false;
+    }
+  }
+  setSize(W,H,DPR);
+  return true;
 }
 
 function frame(t){
   if(!running) return;
   rafId=requestAnimationFrame(frame);
-  // Butter-smooth: lerp adaptif — lebih lambat di dekat batas fase (transisi mulus),
-  // lebih cepat di tengah fase (responsif). Menghindari "patah" antar fase.
+  if(lastT<0){ lastT=t; }
+  var dt=Math.min((t-lastT)/1000, 0.1); lastT=t;
+  simTime+=dt;
+
   var dj=Math.abs(targetJourney-journey);
-  var distToEdge=Math.min(
-    Math.abs(journey-.30), Math.abs(journey-.44)
-  );
-  // melambat dalam radius 0.06 dari batas fase
+  var distToEdge=Math.min(Math.abs(journey-.30), Math.abs(journey-.44));
   var slowF=distToEdge<.06 ? .35+.65*(distToEdge/.06) : 1;
   var lerpF=Math.min(.12,.03+dj*.25)*slowF+.02*slowF;
   journey+=(targetJourney-journey)*Math.max(.015,lerpF);
-  // snap halus saat sangat dekat (hindari jitter abadi)
   if(Math.abs(targetJourney-journey)<.0004) journey=targetJourney;
-  var j=journey, time=t*.001;
+  var j=journey, time=simTime;
+  var hz=isMobile?0.115:0.135;
+
+  if(fallback2D){
+    renderFallback2D(time);
+    return;
+  }
 
   if(j<.30){
-    /* ---- BLACK HOLE: kamera mendekat, BH membesar & mendominasi ----
-       Posisi ala poggufanz: sepertiga KANAN, agak ke atas.
-       Saat kamera mendekat, BH bergeser ke tengah-kanan (jatuh ke singularitas). */
+    /* BLACK HOLE (pure GLSL): kamera mendekat */
     var p=j/.30;
-    // ease-in: mulai jauh, lalu "jatuh" mendekat
     var e=p*p*(3-2*p);
-    var camZ=30-e*26;             // 30 → 4
-    camera.position.set(Math.sin(time*.12)*.6, Math.cos(time*.09)*.5, camZ);
-    camera.lookAt(0,.4,0);
-    camera.fov=baseFov; camera.updateProjectionMatrix();
-    // offset kanan: proporsional terhadap lebar pandang agar konsisten di HP & desktop
-    var halfW=Math.tan(baseFov*Math.PI/360)*camZ*camera.aspect;
-    var fx=0.42-e*0.24;           // 0.42 (kanan) → 0.18 (tengah-kanan)
-    bhGroup.position.set(halfW*fx, 1.2-e*0.6, 0);  // agak ke atas, turun perlahan
-    var s=1.4+e*2.7;              // v2: BH 1.6-1.9x LEBIH BESAR — dominan, overlap teks
-    // "bernapas": pulsasi halus ±1.5%
-    var breathe=1+Math.sin(time*.8)*.015;
-    bhGroup.scale.set(s*breathe,s*breathe,s*breathe);
-    bhGroup.visible=true;
-    // Shader disk: update waktu (turbulensi animasi, doppler tetap di satu sisi)
-    var du=bhGroup.userData.diskUniforms;
-    if(du) du.uTime.value=time;
-    glowInner.rotation.z=-time*.05;
-    // Lensing arcs berdenyut halus — hidup seperti Gargantua di film
-    if(lensUp) lensUp.material.opacity=.72+Math.sin(time*.55)*.12;
-    var lu2=bhGroup.userData.lensUp2;
-    if(lu2) lu2.material.opacity=.42+Math.sin(time*.55+.6)*.08;
-    if(lensDown) lensDown.material.opacity=.30+Math.sin(time*.55+1.2)*.07;
-    if(photonRing) photonRing.material.opacity=.78+Math.sin(time*1.1)*.1;
-    tessGroup.visible=false;
-    stars.visible=true;
-    resetStars();
-    flashPlane.visible=false;
-  } else if(j<.44){
-    /* ---- THE FALL: warp ke singularitas ---- */
-    var p2=(j-.30)/.14;           // 0..1
-    var bhXc=bhGroup.position.x;
-    camera.position.set(bhXc*p2*.85,.3,4-p2*10);  // menembus horizon, melengkung ke arah BH
-    camera.lookAt(bhXc*.7,.4,-20);
-    // FOV punch: 62 → 105 → 62 (efek terowongan)
-    camera.fov=baseFov+Math.sin(p2*Math.PI)*43;
-    camera.updateProjectionMatrix();
-    // BH melahap layar — skala deterministik (kontinu dari fase 1: 4.1 → 20.5)
-    var fs=4.1*(1+p2*4);
-    bhGroup.scale.set(fs,fs,fs);
-    // star-stretch: bintang memanjang ke arah kamera
-    stretchStars(p2);
-    stars.visible=true;
-    // white flash memuncak di tengah fase
-    flashPlane.visible=true;
-    flashPlane.position.set(camera.position.x,camera.position.y,camera.position.z-8);
-    flashPlane.material.opacity=Math.sin(p2*Math.PI)*.85;
-    tessGroup.visible=p2>.55;
-  } else {
-    /* ---- TESSERACT: lorong infinite, kamera maju STABIL ---- */
-    var p3=(j-.44)/.56;           // 0..1
-    var camZ2=-172-p3*380;        // -172 → -552
-    // STABIL: tanpa sway lateral. Hanya drift vertikal super halus (±0.12).
+    var cx=aspectNow*(0.30-0.20*e);
+    var cy=0.06-0.05*e;
+    renderBH(time, e, 0, cx, cy, hz);
+  }else if(j<.44){
+    /* THE FALL: warp shader */
+    var p2=(j-.30)/.14;
+    renderBH(time, 1.0, p2, aspectNow*0.10, 0.01, hz);
+  }else{
+    /* TESSERACT (Three.js) */
+    glResetForThree();
+    var p3=(j-.44)/.56;
+    var camZ2=-172-p3*380;
     camera.position.set(0, Math.sin(time*.25)*.12, camZ2);
     camera.lookAt(0, Math.sin(time*.25)*.12, camZ2-40);
     camera.fov=baseFov; camera.updateProjectionMatrix();
-    bhGroup.visible=false;
-    stars.visible=false;
-    flashPlane.visible=false;
-    tessGroup.visible=true;
-    // Debu melayang lembut — hidup, sinematik
     var dust=tessGroup.userData.dust;
     if(dust){
       var dp=dust.geometry.attributes.position.array;
@@ -479,51 +562,27 @@ function frame(t){
       dust.geometry.attributes.position.needsUpdate=true;
       dust.material.opacity=.4+Math.sin(time*.5)*.12;
     }
-    // Cahaya ujung berdenyut lembut — menuntun mata ke depan
-    // (destGlow adalah child terakhir tessGroup sebelum stars? akses via userData)
+    renderer.render(scene,camera);
   }
-
-  renderer.render(scene,camera);
-}
-
-function resetStars(){
-  if(!stars||!stars.visible) return;
-  starPos.set(starBase);
-  stars.geometry.attributes.position.needsUpdate=true;
-  stars.material.opacity=.85;
-}
-
-function stretchStars(p2){
-  // Bintang "tertinggal": z bergerak ke kamera + opacity naik = efek warp
-  for(var i=0;i<STAR_N;i++){
-    var bz=starBase[i*3+2];
-    starPos[i*3]=starBase[i*3];
-    starPos[i*3+1]=starBase[i*3+1];
-    starPos[i*3+2]=bz+p2*120*(1+((i%7)/7));
-  }
-  stars.geometry.attributes.position.needsUpdate=true;
-  stars.material.opacity=.85+p2*.15;
 }
 
 onmessage=function(e){
   var m=e.data;
   try{
     if(m.type==='init'){
-      buildScene(m.canvas, m.width, m.height, m.dpr, m.isMobile);
-      postMessage({type:'ready'});
-      rafId=requestAnimationFrame(frame);
-    } else if(m.type==='scroll'){
-      targetJourney=Math.max(0,Math.min(1,m.journey));
-    } else if(m.type==='resize'){
-      if(renderer && camera){
-        camera.aspect=m.width/m.height;
-        camera.updateProjectionMatrix();
-        renderer.setSize(m.width,m.height,false);
+      var ok=buildScene(m.canvas, m.width, m.height, m.dpr, m.isMobile);
+      if(ok){
+        postMessage({type:'ready'});
+        rafId=requestAnimationFrame(frame);
       }
-    } else if(m.type==='pause'){
+    }else if(m.type==='scroll'){
+      targetJourney=Math.max(0,Math.min(1,m.journey));
+    }else if(m.type==='resize'){
+      setSize(m.width, m.height, m.dpr);
+    }else if(m.type==='pause'){
       running=false; if(rafId) cancelAnimationFrame(rafId); rafId=0;
-    } else if(m.type==='resume'){
-      if(!running){ running=true; rafId=requestAnimationFrame(frame); }
+    }else if(m.type==='resume'){
+      if(!running){ running=true; lastT=-1; rafId=requestAnimationFrame(frame); }
     }
   }catch(err){
     postMessage({type:'error', msg:String(err&&err.message||err)});
