@@ -1,9 +1,32 @@
 /* ============================================================
    MAGERWEB® — Cosmic interactions
-   starfield · intro · clock · reveal · faq · nav
+   starfield · intro · clock · reveal · faq · nav · lenis
    ============================================================ */
 (function(){
 'use strict';
+
+/* ---------- LENIS smooth scroll — ala poggufanz (lerp 0.085, wheelMultiplier 0.9) ----------
+   Referensi TIDAK pakai GSAP — Lenis saja. Native window.scrollY tetap akurat,
+   jadi semua scroll listener existing terus jalan. Stop selama loader. */
+var lenis=null;
+(function initLenis(){
+  var reduceM=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduceM) return; /* hormati reduced-motion: tanpa smooth scroll */
+  if(typeof window.Lenis==='undefined') return; /* CDN gagal: fallback native scroll */
+  try{
+    lenis=new window.Lenis({ lerp:0.085, wheelMultiplier:0.9 });
+    window.__lenis=lenis;
+    /* rAF loop untuk Lenis */
+    (function raf(time){
+      if(lenis) lenis.raf(time);
+      requestAnimationFrame(raf);
+    })(performance.now());
+    /* stop selama loader — cegah scroll sebelum intro selesai */
+    lenis.stop();
+    /* start saat intro selesai (dipanggil dari finishIntro) */
+    window.__lenisStart=function(){ if(lenis) lenis.start(); };
+  }catch(e){ lenis=null; }
+})();
 
 /* ---------- Lucide ---------- */
 function initIcons(){
@@ -18,10 +41,10 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
    Mencegah iframe bersarang + meringankan efek di dalam demo. */
 
 /* ============ CHARACTER-SPLIT TEXT — ala poggufanz ============
-   3 varian: .split--warp (hero, tertarik ke black hole saat scroll)
-             .split--rise (headings, naik dengan stagger)
-             .split--expose (body, terungkap bertahap)
-   Stagger 0.026s–0.045s per karakter via --i custom property.
+   3 varian: .split--warp (hero, 34ms stagger + tertarik ke black hole saat scroll)
+             .split--rise (headings, 26ms stagger, naik)
+             .split--expose (body, 26ms stagger, terungkap bertahap)
+   Stagger via --i custom property per karakter.
    Hormat prefers-reduced-motion. Sekali jalan per elemen. */
 (function(){
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -609,6 +632,7 @@ function initMainThread3D(canvas, isMobile){
     if(done) return; done=true;
     intro.classList.add('gone');
     document.body.classList.remove('loading');
+    if(window.__lenisStart) window.__lenisStart(); /* Lenis: izinkan scroll setelah intro */
     revealHero(); /* pastikan hero visible */
   }
   /* Tahap 1: hormati prefers-reduced-motion — selesaikan instan, tanpa animasi counter.
@@ -710,7 +734,14 @@ function initMainThread3D(canvas, isMobile){
       var id=a.getAttribute('href');
       if(id && id.charAt(0)==='#'){
         var t=document.querySelector(id);
-        if(t){ e.preventDefault(); closeMenu(); t.scrollIntoView({behavior:'smooth',block:'start'}); }
+        if(t){ e.preventDefault(); closeMenu();
+          /* Lenis: pakai scrollTo agar smooth; fallback ke native */
+          if(window.__lenis && typeof window.__lenis.scrollTo==='function'){
+            window.__lenis.scrollTo(t,{offset:0});
+          } else {
+            t.scrollIntoView({behavior:'smooth',block:'start'});
+          }
+        }
       }
     });
   });
