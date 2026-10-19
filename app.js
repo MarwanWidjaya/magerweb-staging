@@ -229,6 +229,7 @@ function initMainThread3D(canvas, isMobile){
       worker.onmessage=function(e){
         if(e.data.type==='ready'){ ready=true; }
         else if(e.data.type==='error'){ initFallback(); }
+        else if(e.data.type==='intro' && window.__onWorkerIntro){ window.__onWorkerIntro(e.data); }
       };
       worker.onerror=function(){ initFallback(); };
       worker.postMessage({type:'init', canvas:off,
@@ -579,18 +580,16 @@ function initMainThread3D(canvas, isMobile){
   if(!intro) return;
   /* poggufanz-match: nav terlihat redup selama intro */
   document.body.classList.add('loading');
-  /* Fase 1 Tahap A: counter 000-100 (format DEPTH, sesuai referensi poggufanz).
-     PLANCK EPOCH + progress bar dihapus (tidak ada di referensi). */
-  var num=document.getElementById('introNum'), p=0, done=false;
-  function finish(){
-    if(done) return; done=true;
-    intro.classList.add('gone');
-    document.body.classList.remove('loading');
+  /* Fase 1 REVISI: counter 000-100 di-overlay kiri-bawah di atas animasi shader.
+     Sync ke worker simTime (bukan timer DOM terpisah). Hero SUDAH visible
+     di balik counter — tidak ada cut/fade hitam. Di 100: counter fade out. */
+  var num=document.getElementById('introNum'), done=false, heroRevealed=false;
+  function revealHero(){
+    if(heroRevealed) return; heroRevealed=true;
     var heroRvs=document.querySelectorAll('.hero .rv');
     for(var i=0;i<heroRvs.length;i++){
       (function(el,j){ setTimeout(function(){ el.classList.add('in'); },160+j*130); })(heroRvs[i],i);
     }
-    // hero split-text dipicu via IntersectionObserver (otomatis)
     setTimeout(function(){
       var hh=document.querySelector('.hero .split');
       if(hh && !hh.classList.contains('on')){
@@ -600,18 +599,34 @@ function initMainThread3D(canvas, isMobile){
       }
     }, 400);
   }
-  var seen=false;
-  try{ seen=!!localStorage.getItem('mw_seen'); localStorage.setItem('mw_seen','1'); }catch(e){}
-  /* Timing deterministik ~2.8s: sinkron dengan formasi Big Bang di canvas.
-     Counter 000->100 sinkron dengan progres visual. */
-  var DUR_MS=2800, TICK=50;
-  var step=100/(DUR_MS/TICK);
-  var iv=setInterval(function(){
-    if(num) num.textContent=String(Math.floor(p)).padStart(3,'0');
-    p=Math.min(100, p+step*(seen?2.2:1));
-    if(p>=100){ clearInterval(iv); setTimeout(finish,380); }
-  },TICK);
-  setTimeout(finish,4200); /* failsafe */
+  function finishIntro(){
+    if(done) return; done=true;
+    intro.classList.add('gone');
+    document.body.classList.remove('loading');
+    revealHero(); /* pastikan hero visible */
+  }
+  /* Dipanggil dari worker.onmessage saat terima {type:'intro'}.
+     t = worker simTime (detik), dur = durasi intro shader (2.8s).
+     Hero mulai reveal di ~70% agar sudah visible saat counter 100. */
+  window.__onWorkerIntro=function(d){
+    if(done) return;
+    var t=d.t||0, dur=d.dur||2.8;
+    var v=Math.min(100, Math.floor(t/dur*100));
+    if(num) num.textContent=String(v).padStart(3,'0');
+    if(v>=70) revealHero(); /* hero visible sebelum counter selesai */
+    if(d.done || v>=100){ setTimeout(finishIntro, 250); }
+  };
+  /* Fallback: jika worker tidak kirim intro (fallback mode), pakai timer lokal.
+     Juga failsafe: paksa selesai setelah 6 detik. */
+  var lp=0, liv=setInterval(function(){
+    if(done){ clearInterval(liv); return; }
+    if(window.__worker3D) return; /* worker aktif — tunggu pesan worker */
+    lp=Math.min(100, lp+2);
+    if(num) num.textContent=String(Math.floor(lp)).padStart(3,'0');
+    if(lp>=70) revealHero();
+    if(lp>=100){ clearInterval(liv); setTimeout(finishIntro, 250); }
+  }, 56);
+  setTimeout(function(){ if(!done){ clearInterval(liv); finishIntro(); } }, 6000);
 })();
 
 /* ---------- Clock + date ---------- */
