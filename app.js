@@ -251,7 +251,7 @@ function initMainThread3D(canvas, isMobile){
   function initWorker(){
     try{
       if(!window.Worker || !canvas.transferControlToOffscreen) return false;
-      worker=new Worker('worker-3d.js?v=20261019g');
+      worker=new Worker('worker-3d.js?v=20261019i');
       var off=canvas.transferControlToOffscreen();
       var ready=false;
       worker.onmessage=function(e){
