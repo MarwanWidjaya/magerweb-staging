@@ -579,8 +579,9 @@ function initMainThread3D(canvas, isMobile){
   if(!intro) return;
   /* poggufanz-match: nav terlihat redup selama intro */
   document.body.classList.add('loading');
-  var num=document.getElementById('introNum'),
-      bar=document.getElementById('introBar'), p=0, done=false;
+  /* Fase 1 Tahap A: counter 000-100 (format DEPTH, sesuai referensi poggufanz).
+     PLANCK EPOCH + progress bar dihapus (tidak ada di referensi). */
+  var num=document.getElementById('introNum'), p=0, done=false;
   function finish(){
     if(done) return; done=true;
     intro.classList.add('gone');
@@ -601,12 +602,15 @@ function initMainThread3D(canvas, isMobile){
   }
   var seen=false;
   try{ seen=!!localStorage.getItem('mw_seen'); localStorage.setItem('mw_seen','1'); }catch(e){}
+  /* Timing deterministik ~2.8s: sinkron dengan formasi Big Bang di canvas.
+     Counter 000->100 sinkron dengan progres visual. */
+  var DUR_MS=2800, TICK=50;
+  var step=100/(DUR_MS/TICK);
   var iv=setInterval(function(){
-    p=Math.min(100, p+(seen?Math.random()*30+18:Math.random()*15+7));
-    if(bar) bar.style.width=p+'%';
-    if(num) num.textContent=String(Math.floor(p/100*999)+1).padStart(3,'0');
+    p=Math.min(100, p+step*(seen?2.2:1));
+    if(num) num.textContent=String(Math.floor(p)).padStart(3,'0');
     if(p>=100){ clearInterval(iv); setTimeout(finish,380); }
-  },130);
+  },TICK);
   setTimeout(finish,4200); /* failsafe */
 })();
 
