@@ -59,11 +59,13 @@
 </div>
 <div id="nebula" aria-hidden="true"></div>
 
-<!-- ============ INTRO (Scene 0: Loader) ============ -->
+<!-- ============ INTRO (Scene 0: counter overlay di atas animasi shader) ============
+     Fase 1 revisi: BUKAN loader overlay fullscreen. Counter 000-100 di-overlay
+     kiri-bawah di atas animasi shader yang jalan dari t=0. Sync via worker. -->
 <div id="intro" aria-hidden="true">
-  <canvas id="bangCanvas"></canvas>
   <div class="intro-inner">
     <div class="intro-num mono" id="introNum">000</div>
+    <div class="intro-rule"></div>
     <div class="intro-label mono">MAGERWEB / INDONESIA</div>
   </div>
 </div>
