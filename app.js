@@ -92,17 +92,22 @@ function initMainThread3D(canvas, isMobile){
     var scene=new THREE.Scene();
     scene.fog=new THREE.FogExp2(0x060503,0.011);
     var camera=new THREE.PerspectiveCamera(62,window.innerWidth/window.innerHeight,.1,900);
-    // Black hole (fallback sederhana)
+    // Black hole (fallback sederhana) — v2: skala diselaraskan dengan worker
     var bh=new THREE.Group();
-    bh.add(new THREE.Mesh(new THREE.SphereGeometry(3.2,32,32),
+    bh.add(new THREE.Mesh(new THREE.SphereGeometry(4.0,32,32),
       new THREE.MeshBasicMaterial({color:0x000000})));
-    var disk=new THREE.Mesh(new THREE.RingGeometry(3.7,8.6,64),
-      new THREE.MeshBasicMaterial({color:0xE9A13B,transparent:true,opacity:.9,side:THREE.DoubleSide}));
+    var disk=new THREE.Mesh(new THREE.RingGeometry(4.45,12.2,64),
+      new THREE.MeshBasicMaterial({color:0xF5C86A,transparent:true,opacity:.9,side:THREE.DoubleSide}));
     disk.rotation.x=-Math.PI/2.25; bh.add(disk);
-    var halo=new THREE.Mesh(new THREE.RingGeometry(3.4,10.5,64),
-      new THREE.MeshBasicMaterial({color:0xd98a3a,transparent:true,opacity:.16,
+    var halo=new THREE.Mesh(new THREE.RingGeometry(4.2,13.0,64),
+      new THREE.MeshBasicMaterial({color:0xd98a3a,transparent:true,opacity:.10,
         side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));
     halo.rotation.x=-Math.PI/2.25; bh.add(halo);
+    // Orbit ring fallback — SATU saja (v2)
+    var forb=new THREE.Mesh(new THREE.RingGeometry(14.8,15.02,96),
+      new THREE.MeshBasicMaterial({color:0xa8a8b2,transparent:true,opacity:.38,
+        side:THREE.DoubleSide,depthWrite:false}));
+    bh.add(forb);
     scene.add(bh);
     // Tesseract fallback: rak buku sederhana di koridor
     var tess=new THREE.Group();
@@ -142,7 +147,7 @@ function initMainThread3D(canvas, isMobile){
       if(j<.30){
         var p=j/.30, e=p*p*(3-2*p);
         camera.position.set(0,0,30-e*26); camera.lookAt(0,.4,0);
-        var s=(1+e*2.1)*(1+Math.sin(time*.8)*.015); bh.scale.set(s,s,s);
+        var s=(1.4+e*2.7)*(1+Math.sin(time*.8)*.015); bh.scale.set(s,s,s);
         /* fallback: BH di sepertiga kanan */
         var fhw=Math.tan(62*Math.PI/360)*(30-e*26)*camera.aspect;
         bh.position.set(fhw*(0.42-e*0.24),1.2-e*0.6,0);
