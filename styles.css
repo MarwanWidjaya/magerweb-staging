@@ -62,10 +62,8 @@ section[id]{scroll-margin-top:80px}
   background:linear-gradient(180deg,#fff 30%,#444);
   -webkit-background-clip:text;background-clip:text;color:transparent;
   text-shadow:0 0 80px rgba(255,107,53,.12)}
-.intro-epoch{font-size:.72rem;letter-spacing:.42em;color:var(--accent);margin:1.2rem 0 .6rem}
-.intro-label{font-size:.66rem;letter-spacing:.34em;color:var(--dim);margin:0 0 1.6rem}
-.intro-bar{width:min(300px,58vw);height:2px;background:rgba(255,255,255,.08);margin:0 auto;border-radius:2px;overflow:hidden}
-.intro-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),#fff);transition:width .25s}
+.intro-label{font-size:.66rem;letter-spacing:.34em;color:var(--dim);margin:1.2rem 0 0}
+/* Fase 1 Tahap A: .intro-epoch & .intro-bar dihapus dari HTML (tidak ada di referensi) */
 
 /* ---------- header ---------- */
 .nav{position:fixed;top:0;left:0;right:0;z-index:100;
@@ -505,9 +503,8 @@ section[id]{scroll-margin-top:80px}
 /* ============ POGGUFANZ MATCH — intro minimal (hampir hitam total) ============ */
 #intro{background:#030304}
 .intro-num{font-size:clamp(3.4rem,12vw,6.5rem);text-shadow:none;opacity:.9}
-.intro-epoch{font-size:.62rem;letter-spacing:.4em;opacity:.75}
 .intro-label{font-size:.58rem;opacity:.6}
-.intro-bar{width:min(200px,44vw);opacity:.7}
+/* Fase 1 Tahap A: .intro-epoch & .intro-bar rules dihapus (elemen tidak ada di HTML) */
 /* Nav redup & terlihat selama intro */
 body.loading .nav{z-index:201;opacity:.5;pointer-events:none}
 
