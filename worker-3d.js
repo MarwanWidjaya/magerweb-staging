@@ -13,7 +13,7 @@
 importScripts('https://unpkg.com/three@0.160.0/build/three.min.js');
 
 var renderer=null, scene=null, camera=null;
-var bhGroup=null, disk=null, glowInner=null, glowOuter=null, arc=null;
+var bhGroup=null, disk=null, glowInner=null;
 var lensUp=null, lensDown=null, photonRing=null;
 var tessGroup=null, flashPlane=null;
 var stars=null, starPos=null, starBase=null, STAR_N=0;
@@ -31,29 +31,48 @@ function buildScene(canvas, W, H, DPR, mobile){
   camera=new THREE.PerspectiveCamera(baseFov,W/H,.1,900);
 
   /* ================= WORLD 0: BLACK HOLE (Gargantua) ================= */
+  /* v2 (2026-10-19): perbandingan langsung vs poggufanz.xyz
+     1. UKURAN 1.6-1.9x lebih besar — dominan, overlap teks
+     2. DISK MELENGKUNG (lensing): sisi jauh menekuk naik di atas bayangan
+     3. WARNA lebih terang: putih-kuning lembut → emas lembut (volumetrik)
+     4. SATU orbit ring saja (hapus yang ganda)
+     5. LENSING ARCS tipis konsentris (hapus halo perunggu tebal)
+     6. VOLUMETRIK: radial glow sprite + soft falloff, tanpa edge keras */
   bhGroup=new THREE.Group();
 
-  // Event horizon — hitam pekat sempurna
+  // Event horizon — hitam pekat sempurna (diperbesar 3.2 → 4.0)
   var bhSphere=new THREE.Mesh(
-    new THREE.SphereGeometry(3.2,64,64),
+    new THREE.SphereGeometry(4.0,64,64),
     new THREE.MeshBasicMaterial({color:0x000000})
   );
   bhGroup.add(bhSphere);
 
   /* ============ ACCRETION DISK — custom shader ala Gargantua ============
-     Fitur:
-     - Gradasi akurat: putih-biru (inner, terpanas) → emas → oranye gelap (outer)
-     - Doppler beaming: sisi yang bergerak mendekati viewer LEBIH TERANG
-       (efek relativistik — ciri khas disk black hole di film)
-     - Turbulensi ANIMASI (time-based, bukan baked statis)
-     - Inner edge SANGAT TERANG (material yang jatuh, terpanas)
-     - Radial streaks (aliran akresi) */
-  var DISK_IN=3.55, DISK_OUT=9.8;
+     v2: - Geometri MELENGKUNG: sisi jauh (belakang BH) menekuk NAIK,
+           meniru gravitational lensing di Interstellar (bukan cakram datar!)
+         - Warna LEBIH TERANG & LEMBUT: putih-kuning → emas lembut
+         - Doppler beaming dilembutkan (0.85 → 0.55): volumetrik, bukan flat
+         - Alpha falloff LEBIH LEMBUT di tepi luar */
+  var DISK_IN=4.45, DISK_OUT=12.2;
   var diskUniforms={
     uTime:{value:0},
     uInnerR:{value:DISK_IN},
     uOuterR:{value:DISK_OUT}
   };
+  // Geometri disk melengkung: sisi jauh menekuk ke atas (lensing)
+  var diskGeo=new THREE.RingGeometry(DISK_IN,DISK_OUT,180,20);
+  (function curveDisk(){
+    var dp=diskGeo.attributes.position;
+    for(var i=0;i<dp.count;i++){
+      var vy=dp.getY(i);
+      if(vy>0){
+        // sisi jauh (local +Y → world -Z setelah rotasi): angkat ke atas
+        var f=vy/DISK_OUT;
+        dp.setZ(i, Math.pow(f,2.2)*7.5);
+      }
+    }
+    diskGeo.computeVertexNormals();
+  })();
   var diskMat=new THREE.ShaderMaterial({
     uniforms:diskUniforms,
     transparent:true,
@@ -76,80 +95,69 @@ function buildScene(canvas, W, H, DPR, mobile){
       'varying vec2 vPolar;',
       'uniform float uTime;',
       'vec3 diskColor(float r){',
-      '  vec3 hot=vec3(0.96,0.98,1.0);',   // putih-biru: inner terpanas
-      '  vec3 mid=vec3(1.0,0.76,0.40);',    // emas
-      '  vec3 outc=vec3(0.50,0.19,0.05);',  // oranye gelap: outer terdingin
-      '  vec3 c=mix(hot,mid,smoothstep(0.0,0.42,r));',
-      '  c=mix(c,outc,smoothstep(0.42,1.0,r));',
+      // v2: LEBIH TERANG & LEMBUT (volumetrik, bukan ilustrasi datar)
+      '  vec3 hot=vec3(1.0,0.99,0.94);',    // putih-kuning terang: inner
+      '  vec3 mid=vec3(1.0,0.82,0.52);',     // emas LEMBUT
+      '  vec3 outc=vec3(0.62,0.30,0.10);',   // oranye lembut: outer
+      '  vec3 c=mix(hot,mid,smoothstep(0.0,0.45,r));',
+      '  c=mix(c,outc,smoothstep(0.45,1.0,r));',
       '  return c;',
       '}',
       'void main(){',
       '  float r=vPolar.x;',
       '  float theta=vPolar.y*6.2831853;',
       '  vec3 col=diskColor(r);',
-      // Doppler beaming: sisi kiri (mendekati viewer) lebih terang & kebiruan
+      // Doppler beaming DILEMBUTKAN (0.85 → 0.55): volumetrik
       '  float side=cos(theta);',
-      '  float beam=1.0+side*0.85;',
+      '  float beam=1.0+side*0.55;',
       '  col*=beam;',
-      '  col.b+=max(0.0,side)*0.18*(1.0-r);',  // blue shift sisi terang
-      '  col.r+=max(0.0,-side)*0.10*(1.0-r);', // red shift sisi redup
-      // Inner edge menyala (material jatuh)
-      '  float innerGlow=pow(1.0-r,7.0)*2.2;',
-      '  col+=vec3(1.0,0.96,0.88)*innerGlow;',
+      '  col.b+=max(0.0,side)*0.12*(1.0-r);',
+      '  col.r+=max(0.0,-side)*0.06*(1.0-r);',
+      // Inner edge menyala (material jatuh) — dilembutkan
+      '  float innerGlow=pow(1.0-r,6.0)*1.8;',
+      '  col+=vec3(1.0,0.98,0.92)*innerGlow;',
       // Turbulensi animasi — pusaran gas yang hidup
-      '  float turb=0.78',
-      '    +0.22*sin(theta*3.0+uTime*0.7+r*14.0)*cos(theta*5.0-uTime*0.45+r*9.0)',
-      '    +0.10*sin(theta*9.0+uTime*1.2+r*22.0);',
+      '  float turb=0.82',
+      '    +0.18*sin(theta*3.0+uTime*0.7+r*14.0)*cos(theta*5.0-uTime*0.45+r*9.0)',
+      '    +0.08*sin(theta*9.0+uTime*1.2+r*22.0);',
       '  col*=turb;',
       // Streaks radial — aliran akresi ke dalam
-      '  float streak=0.86+0.14*sin(theta*28.0+r*36.0-uTime*2.4);',
+      '  float streak=0.88+0.12*sin(theta*28.0+r*36.0-uTime*2.4);',
       '  col*=streak;',
-      // Alpha: solid di dalam, fade di tepi luar
-      '  float alpha=0.97*(1.0-smoothstep(0.82,1.0,r));',
-      '  alpha*=0.88+0.12*turb;',
+      // Alpha: falloff SANGAT LEMBUT (volumetrik, tanpa edge keras)
+      '  float alpha=0.95*(1.0-smoothstep(0.55,1.0,r));',
+      '  alpha*=0.90+0.10*turb;',
       '  gl_FragColor=vec4(col,alpha);',
       '}'
     ].join('\n')
   });
-  disk=new THREE.Mesh(new THREE.RingGeometry(DISK_IN,DISK_OUT,160,16), diskMat);
+  disk=new THREE.Mesh(diskGeo, diskMat);
   disk.rotation.x=-Math.PI/2.08; // nyaris edge-on = disk tipis ala Gargantua
   bhGroup.add(disk);
   bhGroup.userData.diskUniforms=diskUniforms;
 
-  // Inner glow — cincin terang di tepi event horizon
+  // Inner glow — cincin terang di tepi event horizon (dilembutkan)
   glowInner=new THREE.Mesh(
-    new THREE.RingGeometry(3.25,4.1,96),
-    new THREE.MeshBasicMaterial({color:0xffe9b8, transparent:true, opacity:.5,
+    new THREE.RingGeometry(4.05,5.15,96),
+    new THREE.MeshBasicMaterial({color:0xfff2d0, transparent:true, opacity:.42,
       side:THREE.DoubleSide, blending:THREE.AdditiveBlending, depthWrite:false})
   );
   glowInner.rotation.x=-Math.PI/2.08;
   bhGroup.add(glowInner);
 
-  // Outer halo — lembut, hangat
-  glowOuter=new THREE.Mesh(
-    new THREE.RingGeometry(3.4,10.5,96),
-    new THREE.MeshBasicMaterial({color:0xd98a3a, transparent:true, opacity:.14,
-      side:THREE.DoubleSide, blending:THREE.AdditiveBlending, depthWrite:false})
-  );
-  glowOuter.rotation.x=-Math.PI/2.2;
-  bhGroup.add(glowOuter);
+  /* v2: glowOuter (halo perunggu TEBAL) DIHAPUS — diganti volumetric glow
+     lembut + lensing arcs tipis. Tidak ada lagi "pita halo dekoratif". */
 
-  /* --- GARGANTUA LENSING: sisi jauh disk yang dibengkokkan gravitasi ---
-     Ciri khas Interstellar: disk edge-on, tapi cahaya dari SISI JAUH disk
-     (di belakang black hole) tertekuk ke ATAS — terlihat sebagai busur
-     terang melengkung di atas event horizon. Sisi bawah lebih redup.
-     Dibuat dengan vertex-color gradient: terang di tengah busur,
-     meredup ke ujung — seperti cahaya yang dibengkokkan. */
+  /* --- GARGANTUA LENSING ARCS: busur-busur TIPIS konsentris ---
+     v2: tube DITIPISKAN drastis, ditambah 1 busur ekstra.
+     Ini citra cakram yang terlensakan — ciri khas Interstellar. */
   function lensedArc(radius, tube, yPos, colorHot, colorDim, opacity, flip){
-    var geo=new THREE.TorusGeometry(radius,tube,20,160,Math.PI);
-    // Gradient sepanjang busur: terang di tengah, redup di ujung
+    var geo=new THREE.TorusGeometry(radius,tube,16,180,Math.PI);
     var p=geo.attributes.position, n=p.count;
     var cols=new Float32Array(n*3);
     var cH=new THREE.Color(colorHot), cD=new THREE.Color(colorDim), tc=new THREE.Color();
     for(var i=0;i<n;i++){
-      // Torus arc: parameter u sepanjang arc. Estimasi dari sudut.
       var x=p.getX(i);
-      // Tengah busur (x≈0) paling terang
       var f=Math.max(0,1-Math.abs(x)/(radius*1.05));
       f=Math.pow(f,1.6);
       tc.copy(cD).lerp(cH,f);
@@ -164,40 +172,67 @@ function buildScene(canvas, W, H, DPR, mobile){
     return m;
   }
 
-  // Lensing arc lama (dipertahankan, diselaraskan)
-  arc=lensedArc(4.9,.30,1.35,0xffe0a0,0x8a4a18,.5,false);
-  bhGroup.add(arc);
-
   // Photon ring — SANGAT TIPIS, MENYILAUKAN, tepat di tepi event horizon
   photonRing=new THREE.Mesh(
-    new THREE.RingGeometry(3.28,3.42,160),
+    new THREE.RingGeometry(4.08,4.22,180),
     new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:.95,
       side:THREE.DoubleSide, blending:THREE.AdditiveBlending, depthWrite:false})
   );
   photonRing.rotation.x=-Math.PI/2.08;
   bhGroup.add(photonRing);
 
-  // Upper lensed disk — busur TERANG di atas: sisi jauh disk tertekuk gravitasi
-  lensUp=lensedArc(5.7,.62,2.35,0xfff0c8,0xa06828,.85,false);
+  // Upper lensed arc 1 — busur TIPIS terang (tube .62 → .30)
+  lensUp=lensedArc(7.1,.30,2.9,0xfff4d8,0xb08040,.9,false);
   bhGroup.add(lensUp);
+  // Upper lensed arc 2 — busur ekstra LEBIH TIPIS & redup (konsentris)
+  var lensUp2=lensedArc(8.4,.18,3.8,0xffe8c0,0x906838,.55,false);
+  bhGroup.add(lensUp2);
+  bhGroup.userData.lensUp2=lensUp2;
 
-  // Lower lensed disk — busur REDUP di bawah
-  lensDown=lensedArc(5.4,.42,-1.9,0xd88a3a,0x5a2a10,.35,true);
+  // Lower lensed arc — busur TIPIS redup (tube .42 → .24)
+  lensDown=lensedArc(6.7,.24,-2.35,0xe09a4a,0x6a3418,.4,true);
   bhGroup.add(lensDown);
 
   // Back glow — popler di belakang BH agar silhouette tegas
   var backGlow=new THREE.Mesh(
-    new THREE.CircleGeometry(7.5,48),
-    new THREE.MeshBasicMaterial({color:0x3a1e08, transparent:true, opacity:.5,
+    new THREE.CircleGeometry(9.4,48),
+    new THREE.MeshBasicMaterial({color:0x2a1508, transparent:true, opacity:.45,
       blending:THREE.AdditiveBlending, depthWrite:false})
   );
-  backGlow.position.z=-2;
+  backGlow.position.z=-2.5;
   bhGroup.add(backGlow);
 
-  // Orbit ring — bingkai orbit lingkaran abu-abu SANGAT BESAR ala poggufanz
+  /* --- VOLUMETRIC GLOW: sprite radial-gradient lembut ---
+     v2: cahaya volumetrik sinematik (bukan edge keras).
+     Dibuat via OffscreenCanvas (tersedia di worker). */
+  (function addVolumetricGlow(){
+    try{
+      var gc=new OffscreenCanvas(256,256);
+      var g=gc.getContext('2d');
+      var grad=g.createRadialGradient(128,128,0,128,128,128);
+      grad.addColorStop(0,'rgba(255,214,150,0.55)');
+      grad.addColorStop(0.35,'rgba(255,180,100,0.22)');
+      grad.addColorStop(0.7,'rgba(255,150,70,0.07)');
+      grad.addColorStop(1,'rgba(255,140,60,0)');
+      g.fillStyle=grad;
+      g.fillRect(0,0,256,256);
+      var glowTex=new THREE.CanvasTexture(gc);
+      var volGlow=new THREE.Mesh(
+        new THREE.PlaneGeometry(34,34),
+        new THREE.MeshBasicMaterial({map:glowTex, transparent:true,
+          blending:THREE.AdditiveBlending, depthWrite:false})
+      );
+      volGlow.position.z=-1.2;
+      bhGroup.add(volGlow);
+      bhGroup.userData.volGlow=volGlow;
+    }catch(e){ /* glow opsional — abaikan jika gagal */ }
+  })();
+
+  // Orbit ring — SATU SAJA, tipis, SANGAT BESAR, dominan (ala poggufanz)
+  // v2: tidak ada lagi ring ganda/konsentris samar
   var orbitRing=new THREE.Mesh(
-    new THREE.RingGeometry(11.9,12.12,128),
-    new THREE.MeshBasicMaterial({color:0x9a9aa5, transparent:true, opacity:.30,
+    new THREE.RingGeometry(14.8,15.02,160),
+    new THREE.MeshBasicMaterial({color:0xa8a8b2, transparent:true, opacity:.38,
       side:THREE.DoubleSide, depthWrite:false})
   );
   bhGroup.add(orbitRing);
@@ -377,7 +412,7 @@ function frame(t){
     var halfW=Math.tan(baseFov*Math.PI/360)*camZ*camera.aspect;
     var fx=0.42-e*0.24;           // 0.42 (kanan) → 0.18 (tengah-kanan)
     bhGroup.position.set(halfW*fx, 1.2-e*0.6, 0);  // agak ke atas, turun perlahan
-    var s=1+e*2.1;                // BH membesar 3x lipat
+    var s=1.4+e*2.7;              // v2: BH 1.6-1.9x LEBIH BESAR — dominan, overlap teks
     // "bernapas": pulsasi halus ±1.5%
     var breathe=1+Math.sin(time*.8)*.015;
     bhGroup.scale.set(s*breathe,s*breathe,s*breathe);
@@ -386,11 +421,12 @@ function frame(t){
     var du=bhGroup.userData.diskUniforms;
     if(du) du.uTime.value=time;
     glowInner.rotation.z=-time*.05;
-    arc.material.opacity=.4+Math.sin(time*.6)*.12;
     // Lensing arcs berdenyut halus — hidup seperti Gargantua di film
-    if(lensUp) lensUp.material.opacity=.66+Math.sin(time*.55)*.12;
-    if(lensDown) lensDown.material.opacity=.26+Math.sin(time*.55+1.2)*.07;
-    if(photonRing) photonRing.material.opacity=.75+Math.sin(time*1.1)*.1;
+    if(lensUp) lensUp.material.opacity=.72+Math.sin(time*.55)*.12;
+    var lu2=bhGroup.userData.lensUp2;
+    if(lu2) lu2.material.opacity=.42+Math.sin(time*.55+.6)*.08;
+    if(lensDown) lensDown.material.opacity=.30+Math.sin(time*.55+1.2)*.07;
+    if(photonRing) photonRing.material.opacity=.78+Math.sin(time*1.1)*.1;
     tessGroup.visible=false;
     stars.visible=true;
     resetStars();
@@ -404,8 +440,8 @@ function frame(t){
     // FOV punch: 62 → 105 → 62 (efek terowongan)
     camera.fov=baseFov+Math.sin(p2*Math.PI)*43;
     camera.updateProjectionMatrix();
-    // BH melahap layar — skala deterministik (kontinu dari fase 1: 3.1 → 15.5)
-    var fs=3.1*(1+p2*4);
+    // BH melahap layar — skala deterministik (kontinu dari fase 1: 4.1 → 20.5)
+    var fs=4.1*(1+p2*4);
     bhGroup.scale.set(fs,fs,fs);
     // star-stretch: bintang memanjang ke arah kamera
     stretchStars(p2);
