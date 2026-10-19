@@ -95,12 +95,15 @@ function buildScene(canvas, W, H, DPR, mobile){
       'varying vec2 vPolar;',
       'uniform float uTime;',
       'vec3 diskColor(float r){',
-      // v2: LEBIH TERANG & LEMBUT (volumetrik, bukan ilustrasi datar)
-      '  vec3 hot=vec3(1.0,0.99,0.94);',    // putih-kuning terang: inner
-      '  vec3 mid=vec3(1.0,0.82,0.52);',     // emas LEMBUT
-      '  vec3 outc=vec3(0.62,0.30,0.10);',   // oranye lembut: outer
-      '  vec3 c=mix(hot,mid,smoothstep(0.0,0.45,r));',
-      '  c=mix(c,outc,smoothstep(0.45,1.0,r));',
+      // gasColor ala poggufanz: "warm only where bright — a dim orange would read as brown"
+      // gelap: indigo → sedang: violet → terang: rose → paling terang: cream-white
+      '  vec3 core=vec3(1.0,0.90,0.78);',   // cream-white: paling terang
+      '  vec3 rose=vec3(1.0,0.26,0.52);',   // rose: terang
+      '  vec3 viol=vec3(0.44,0.16,0.80);',  // violet: sedang
+      '  vec3 indi=vec3(0.12,0.08,0.42);',  // indigo: gelap
+      '  vec3 c=mix(core,rose,smoothstep(0.0,0.35,r));',
+      '  c=mix(c,viol,smoothstep(0.35,0.70,r));',
+      '  c=mix(c,indi,smoothstep(0.70,1.0,r));',
       '  return c;',
       '}',
       'void main(){',
@@ -181,22 +184,22 @@ function buildScene(canvas, W, H, DPR, mobile){
   photonRing.rotation.x=-Math.PI/2.08;
   bhGroup.add(photonRing);
 
-  // Upper lensed arc 1 — busur TIPIS terang (tube .62 → .30)
-  lensUp=lensedArc(7.1,.30,2.9,0xfff4d8,0xb08040,.9,false);
+  // Upper lensed arc 1 — busur TIPIS terang (gasColor: cream → violet, bukan coklat)
+  lensUp=lensedArc(7.1,.30,2.9,0xfff4d8,0x7a4a9a,.9,false);
   bhGroup.add(lensUp);
   // Upper lensed arc 2 — busur ekstra LEBIH TIPIS & redup (konsentris)
-  var lensUp2=lensedArc(8.4,.18,3.8,0xffe8c0,0x906838,.55,false);
+  var lensUp2=lensedArc(8.4,.18,3.8,0xffe8c0,0x5a3a8a,.55,false);
   bhGroup.add(lensUp2);
   bhGroup.userData.lensUp2=lensUp2;
 
-  // Lower lensed arc — busur TIPIS redup (tube .42 → .24)
-  lensDown=lensedArc(6.7,.24,-2.35,0xe09a4a,0x6a3418,.4,true);
+  // Lower lensed arc — busur TIPIS redup (rose → indigo)
+  lensDown=lensedArc(6.7,.24,-2.35,0xff8a6a,0x3a2a6a,.4,true);
   bhGroup.add(lensDown);
 
-  // Back glow — popler di belakang BH agar silhouette tegas
+  // Back glow — popler di belakang BH agar silhouette tegas (indigo gelap)
   var backGlow=new THREE.Mesh(
     new THREE.CircleGeometry(9.4,48),
-    new THREE.MeshBasicMaterial({color:0x2a1508, transparent:true, opacity:.45,
+    new THREE.MeshBasicMaterial({color:0x1a1030, transparent:true, opacity:.45,
       blending:THREE.AdditiveBlending, depthWrite:false})
   );
   backGlow.position.z=-2.5;
