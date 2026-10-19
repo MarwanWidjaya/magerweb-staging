@@ -522,18 +522,18 @@ body.loading .nav{z-index:201;opacity:.5;pointer-events:none}
    3 varian: warp (hero) / rise (headings) / expose (body).
    Stagger via --i custom property per karakter. */
 .split-ch{display:inline-block;opacity:0;will-change:transform,opacity}
-/* rise: karakter naik dengan stagger 0.034s */
+/* rise: karakter naik dengan stagger 0.026s (section titles, sesuai audit) */
 .split--rise .split-ch{transform:translateY(.6em);
   transition:opacity .7s ease,transform .7s cubic-bezier(.2,.7,.2,1);
-  transition-delay:calc(var(--i,0)*0.034s)}
+  transition-delay:calc(var(--i,0)*0.026s)}
 /* expose: terungkap bertahap, stagger 0.026s */
 .split--expose .split-ch{
   transition:opacity .9s ease;
   transition-delay:calc(var(--i,0)*0.026s)}
-/* warp: hero — stagger 0.045s, warp tambahan via JS (translate property) */
+/* warp: hero — stagger 0.034s (sesuai audit), warp tambahan via JS (translate property) */
 .split--warp .split-ch{
   transition:opacity .8s ease,transform .8s ease;
-  transition-delay:calc(var(--i,0)*0.045s)}
+  transition-delay:calc(var(--i,0)*0.034s)}
 .split.on .split-ch{opacity:1;transform:none}
 /* pastikan spasi antar kata tidak collapse */
 .split{overflow-wrap:break-word}
