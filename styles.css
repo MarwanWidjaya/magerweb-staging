@@ -53,16 +53,17 @@ main,.footer{position:relative;z-index:1}
 section[id]{scroll-margin-top:80px}
 
 /* ---------- intro ---------- */
-#intro{position:fixed;inset:0;z-index:200;background:var(--bg);
-  display:flex;align-items:center;justify-content:center;
-  transition:opacity .8s ease,visibility .8s}
+/* Fase 1 revisi: intro BUKAN overlay fullscreen. Counter di-overlay kiri-bawah
+   di atas animasi shader yang jalan dari t=0. Background transparan. */
+#intro{position:fixed;left:2rem;bottom:2rem;z-index:200;background:transparent;
+  pointer-events:none;
+  transition:opacity .6s ease,visibility .6s}
 #intro.gone{opacity:0;visibility:hidden}
-.intro-inner{text-align:center}
-.intro-num{font-size:clamp(6rem,22vw,13rem);font-weight:700;letter-spacing:-.05em;line-height:.9;
-  background:linear-gradient(180deg,#fff 30%,#444);
-  -webkit-background-clip:text;background-clip:text;color:transparent;
-  text-shadow:0 0 80px rgba(255,107,53,.12)}
-.intro-label{font-size:.66rem;letter-spacing:.34em;color:var(--dim);margin:1.2rem 0 0}
+.intro-inner{text-align:left}
+.intro-num{font-size:clamp(3rem,10vw,5.5rem);font-weight:200;letter-spacing:-.02em;line-height:1;
+  color:#fff;opacity:.92}
+.intro-rule{width:3.5rem;height:1px;background:rgba(255,255,255,.35);margin:.7rem 0 .55rem}
+.intro-label{font-size:.6rem;letter-spacing:.3em;color:rgba(255,255,255,.55)}
 /* Fase 1 Tahap A: .intro-epoch & .intro-bar dihapus dari HTML (tidak ada di referensi) */
 
 /* ---------- header ---------- */
@@ -435,7 +436,6 @@ section[id]{scroll-margin-top:80px}
     radial-gradient(ellipse 30% 20% at 70% 70%, rgba(255,107,53,.05) 0%, transparent 60%)}
 .final-cta .wrap{position:relative;z-index:2}
 
-#bangCanvas{position:absolute;inset:0;width:100%;height:100%;opacity:.9}
 #intro .intro-inner{position:relative;z-index:2}
 
 
@@ -500,10 +500,11 @@ section[id]{scroll-margin-top:80px}
   background:var(--accent);transform-origin:left;transform:scaleX(var(--rp,0));transition:transform .3s}
 .rooms-timeline #roomCur{color:var(--accent)}
 
-/* ============ POGGUFANZ MATCH — intro minimal (hampir hitam total) ============ */
-#intro{background:#030304}
-.intro-num{font-size:clamp(3.4rem,12vw,6.5rem);text-shadow:none;opacity:.9}
-.intro-label{font-size:.58rem;opacity:.6}
+/* ============ FASE 1 REVISI — intro overlay minimal (transparan, kiri-bawah) ============ */
+#intro{background:transparent;left:1.25rem;bottom:1.25rem}
+.intro-num{font-size:clamp(2.6rem,9vw,4rem);font-weight:200;letter-spacing:-.02em;text-shadow:none;opacity:.92;color:#fff}
+.intro-label{font-size:.55rem;opacity:.55;letter-spacing:.3em}
+.intro-rule{width:2.8rem}
 /* Fase 1 Tahap A: .intro-epoch & .intro-bar rules dihapus (elemen tidak ada di HTML) */
 /* Nav redup & terlihat selama intro */
 body.loading .nav{z-index:201;opacity:.5;pointer-events:none}
