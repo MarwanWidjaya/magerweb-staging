@@ -386,8 +386,15 @@ function renderFallback2D(time){
   for(i=0;i<fbStars.length;i++){
     s=fbStars[i];
     var tw=0.5+0.5*Math.sin(time*2+s[2]*20);
-    ctx2d.fillStyle='rgba(200,210,255,'+(0.25+0.55*tw*s[2]).toFixed(3)+')';
-    ctx2d.fillRect(s[0]*w, s[1]*h, 2, 2);
+    var alpha=0.25+0.55*tw*s[2];
+    var sx=s[0]*w, sy=s[1]*h;
+    var r=2+s[2]*2; /* 2-4px radius, soft dot */
+    var sg=ctx2d.createRadialGradient(sx,sy,0,sx,sy,r*2);
+    sg.addColorStop(0,'rgba(200,210,255,'+alpha.toFixed(3)+')');
+    sg.addColorStop(0.4,'rgba(200,210,255,'+(alpha*0.5).toFixed(3)+')');
+    sg.addColorStop(1,'rgba(200,210,255,0)');
+    ctx2d.fillStyle=sg;
+    ctx2d.beginPath(); ctx2d.arc(sx,sy,r*2,0,7); ctx2d.fill();
   }
   var cx=w*0.68, cy=h*0.45, R=Math.min(w,h)*0.15;
   var pulse=1+0.012*Math.sin(time*0.9);
