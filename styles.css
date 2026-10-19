@@ -510,3 +510,37 @@ section[id]{scroll-margin-top:80px}
 .intro-bar{width:min(200px,44vw);opacity:.7}
 /* Nav redup & terlihat selama intro */
 body.loading .nav{z-index:201;opacity:.5;pointer-events:none}
+
+/* Hardening 2026-10-19: ganti inline style="" (untuk CSP tanpa unsafe-inline) */
+.rv-mt{margin-top:2.5rem}
+.btn-mt{margin-top:14px}
+.icon-link svg{width:17px;height:17px}
+
+/* ============ CHARACTER-SPLIT TEXT — ala poggufanz (2026-10-19) ============
+   3 varian: warp (hero) / rise (headings) / expose (body).
+   Stagger via --i custom property per karakter. */
+.split-ch{display:inline-block;opacity:0;will-change:transform,opacity}
+/* rise: karakter naik dengan stagger 0.034s */
+.split--rise .split-ch{transform:translateY(.6em);
+  transition:opacity .7s ease,transform .7s cubic-bezier(.2,.7,.2,1);
+  transition-delay:calc(var(--i,0)*0.034s)}
+/* expose: terungkap bertahap, stagger 0.026s */
+.split--expose .split-ch{
+  transition:opacity .9s ease;
+  transition-delay:calc(var(--i,0)*0.026s)}
+/* warp: hero — stagger 0.045s, warp tambahan via JS (translate property) */
+.split--warp .split-ch{
+  transition:opacity .8s ease,transform .8s ease;
+  transition-delay:calc(var(--i,0)*0.045s)}
+.split.on .split-ch{opacity:1;transform:none}
+/* pastikan spasi antar kata tidak collapse */
+.split{overflow-wrap:break-word}
+/* ============ SOUND TOGGLE — ala poggufanz ============ */
+.sound-toggle{display:inline-flex;align-items:center;gap:.4rem;
+  background:none;border:1px solid rgba(255,255,255,.18);color:#cfd3e1;
+  border-radius:999px;padding:.35rem .8rem;font-size:.72rem;letter-spacing:.08em;
+  cursor:pointer;transition:border-color .25s,color .25s}
+.sound-toggle:hover{border-color:#E9A13B;color:#fff}
+.sound-toggle .st-off{display:none}
+.sound-toggle.muted .st-on{display:none}
+.sound-toggle.muted .st-off{display:inline}
