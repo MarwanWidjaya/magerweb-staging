@@ -355,6 +355,10 @@ var journey=0, targetJourney=0;
 var isMobile=false, running=true, rafId=0;
 var baseFov=62;
 var simTime=0, lastT=-1;
+/* Fase 1 revisi: lapor progress intro ke main thread (throttled).
+   Counter DOM di-overlay di atas animasi shader, sync ke uTime. */
+var lastIntroSent=-1, introDone=false;
+var INTRO_DUR=2.8;
 
 function buildTesseract(){
   scene=new THREE.Scene();
@@ -525,6 +529,16 @@ function frame(t){
   if(Math.abs(targetJourney-journey)<.0004) journey=targetJourney;
   var j=journey, time=simTime;
   var hz=isMobile?0.115:0.135;
+
+  /* Fase 1 revisi: kirim progress intro (throttle ~10Hz) sampai intro selesai.
+     Main thread pakai ini untuk sync counter 000-100 ke timeline shader. */
+  if(!introDone && simTime<INTRO_DUR+0.5){
+    if(simTime-lastIntroSent>0.1){
+      lastIntroSent=simTime;
+      postMessage({type:'intro', t:simTime, dur:INTRO_DUR});
+    }
+    if(simTime>=INTRO_DUR){ introDone=true; postMessage({type:'intro', t:INTRO_DUR, dur:INTRO_DUR, done:true}); }
+  }
 
   if(fallback2D){
     renderFallback2D(time);
