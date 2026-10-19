@@ -17,37 +17,18 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
 /* ---------- EMBED MODE (?embed=1): demo di dalam iframe ----------
    Mencegah iframe bersarang + meringankan efek di dalam demo. */
 
-/* ============ TEXT SCRAMBLE — signature animation ============
-   Pakai: scramble(el) atau tambah class .scramble ke heading.
+/* ============ CHARACTER-SPLIT TEXT — ala poggufanz ============
+   3 varian: .split--warp (hero, tertarik ke black hole saat scroll)
+             .split--rise (headings, naik dengan stagger)
+             .split--expose (body, terungkap bertahap)
+   Stagger 0.026s–0.045s per karakter via --i custom property.
    Hormat prefers-reduced-motion. Sekali jalan per elemen. */
 (function(){
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var GLYPHS='!<>-_\\/[]{}=+*^?#@$%&';
-  function scrambleText(node, done){
-    var orig=node.textContent;
-    if(!orig.trim()){ done(); return; }
-    var len=orig.length, frame=0;
-    var q=[];
-    for(var i=0;i<len;i++) q.push({c:orig[i], start:(Math.random()*15)|0, end:((Math.random()*15)|0)+18});
-    var startMs=performance.now();
-    (function update(){
-      // safety: paksa selesai setelah 3 detik
-      if(performance.now()-startMs>3000){ node.textContent=orig; done(); return; }
-      var out='', n=0;
-      for(var i=0;i<len;i++){
-        if(frame>=q[i].end){ n++; out+=q[i].c; }
-        else if(frame>=q[i].start){ out+=GLYPHS[(Math.random()*GLYPHS.length)|0]; }
-        else { n++; out+=q[i].c; }
-      }
-      node.textContent=out;
-      if(n===len){ node.textContent=orig; done(); }
-      else { frame++; requestAnimationFrame(update); }
-    })();
-  }
-  function scrambleEl(el){
-    if(el.dataset.scrambled || reduceMotion) return;
-    el.dataset.scrambled='1';
-    // kumpulkan text nodes (termasuk dalam <em>, <br> diskip)
+  function splitChars(el){
+    if(el.dataset.splitDone || reduceMotion) return;
+    el.dataset.splitDone='1';
+    // kumpulkan text nodes (termasuk dalam <em>/<span>, <br> diskip)
     var nodes=[];
     (function walk(n){
       for(var i=0;i<n.childNodes.length;i++){
@@ -56,27 +37,79 @@ if(document.fonts && document.fonts.ready){ document.fonts.ready.then(initIcons)
         else if(c.nodeType===1 && c.tagName!=='BR') walk(c);
       }
     })(el);
-    var pending=nodes.length;
-    if(!pending) return;
+    var idx=0;
     nodes.forEach(function(nd){
-      scrambleText(nd, function(){ if(--pending===0){} });
+      var frag=document.createDocumentFragment();
+      var txt=nd.textContent;
+      for(var j=0;j<txt.length;j++){
+        var ch=txt[j];
+        if(ch===' '){ frag.appendChild(document.createTextNode(' ')); continue; }
+        var sp=document.createElement('span');
+        sp.className='split-ch';
+        sp.style.setProperty('--i', idx++);
+        sp.textContent=ch;
+        // aria: sembunyikan duplikat dari screen reader (teks asli tetap di el)
+        sp.setAttribute('aria-hidden','true');
+        frag.appendChild(sp);
+      }
+      nd.parentNode.replaceChild(frag, nd);
     });
   }
-  window.scramble=scrambleEl;
-  // auto: semua .scramble saat masuk viewport (sekali)
+  window.splitChars=splitChars;
+  // auto: semua .split saat masuk viewport (sekali) → tambah .on
   if(!reduceMotion && 'IntersectionObserver' in window){
     var io=new IntersectionObserver(function(es){
       es.forEach(function(e){
         if(e.isIntersecting){
           io.unobserve(e.target);
-          if(!e.target.dataset.scrambled) scrambleEl(e.target);
+          splitChars(e.target);
+          // paksa reflow agar transisi jalan
+          void e.target.offsetWidth;
+          e.target.classList.add('on');
         }
       });
-    },{threshold:.4});
+    },{threshold:.35});
     document.addEventListener('DOMContentLoaded',function(){
-      document.querySelectorAll('.scramble').forEach(function(el){ io.observe(el); });
+      document.querySelectorAll('.split').forEach(function(el){ io.observe(el); });
+    });
+  } else {
+    // reduced motion / tanpa IO: tampilkan langsung
+    document.addEventListener('DOMContentLoaded',function(){
+      document.querySelectorAll('.split').forEach(function(el){
+        splitChars(el); el.classList.add('on');
+      });
     });
   }
+})();
+
+/* ---------- WARP TEXT: hero chars tertarik ke black hole saat scroll ----------
+   Signature poggufanz: tiap karakter punya 'order' = jarak ke singularitas.
+   Di sini: chars dengan --i besar bergerak lebih jauh (tertarik duluan). */
+(function(){
+  var heroTitle=document.querySelector('.hero-title.split--warp');
+  if(!heroTitle) return;
+  var reduceM=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduceM) return;
+  var ticking=false, chars=null;
+  function update(){
+    ticking=false;
+    if(!chars) chars=heroTitle.querySelectorAll('.split-ch');
+    if(!chars.length) return;
+    var vh=window.innerHeight;
+    var p=Math.max(0,Math.min(1,window.scrollY/(vh*0.9)));
+    for(var k=0;k<chars.length;k++){
+      var c=chars[k];
+      if(p<=0.001){ c.style.translate=''; continue; }
+      var e=p*p*(3-2*p); // smoothstep
+      var i=parseFloat(c.style.getPropertyValue('--i'))||0;
+      var pull=1+i*0.05; // char belakangan tertarik lebih kuat
+      var dx=(e*70*pull).toFixed(1), dy=(-e*36*pull).toFixed(1);
+      c.style.translate=dx+'px '+dy+'px';
+    }
+  }
+  window.addEventListener('scroll',function(){
+    if(!ticking){ ticking=true; requestAnimationFrame(update); }
+  },{passive:true});
 })();
 
 var EMBED_MODE = /[?&]embed=1/.test(location.search);
@@ -240,7 +273,7 @@ function initMainThread3D(canvas, isMobile){
   }
 })();
 
-/* ---------- DEPTH METER: angka 000→997 ala poggufanz ---------- */
+/* ---------- DEPTH METER: angka 000→100 ala poggufanz ---------- */
 (function(){
   var num=document.getElementById('dmNum'),
       fill=document.getElementById('dmFill'),
@@ -260,8 +293,8 @@ function initMainThread3D(canvas, isMobile){
     ticking=false;
     var max=document.documentElement.scrollHeight-window.innerHeight;
     var j=max>0?window.scrollY/max:0;
-    /* angka depth 000→997 */
-    num.textContent=String(Math.round(j*997)).padStart(3,'0');
+    /* angka depth 000→100 ala poggufanz */
+    num.textContent=String(Math.round(j*100)).padStart(3,'0');
     if(fill) fill.style.height=(j*100).toFixed(1)+'%';
     if(marker) marker.style.top=(j*100).toFixed(1)+'%';
     if(stage){
@@ -556,10 +589,14 @@ function initMainThread3D(canvas, isMobile){
     for(var i=0;i<heroRvs.length;i++){
       (function(el,j){ setTimeout(function(){ el.classList.add('in'); },160+j*130); })(heroRvs[i],i);
     }
-    // hero scramble setelah intro selesai
+    // hero split-text dipicu via IntersectionObserver (otomatis)
     setTimeout(function(){
-      var hh=document.querySelector('.hero .scramble');
-      if(hh && window.scramble) window.scramble(hh);
+      var hh=document.querySelector('.hero .split');
+      if(hh && !hh.classList.contains('on')){
+        if(window.splitChars) window.splitChars(hh);
+        void hh.offsetWidth;
+        hh.classList.add('on');
+      }
     }, 400);
   }
   var seen=false;
@@ -653,11 +690,7 @@ function initMainThread3D(canvas, isMobile){
   });
 })();
 
-/* ---------- To top ---------- */
-(function(){
-  var b=document.getElementById('toTop');
-  if(b) b.addEventListener('click',function(){ window.scrollTo({top:0,behavior:'smooth'}); });
-})();
+/* ---------- To top: ditangani HYPERSPACE WARP di bawah ---------- */
 
 
 /* ---------- SCROLL ROOMS: satu room per waktu, ganti via scroll vertikal (ala poggufanz) ---------- */
@@ -760,8 +793,8 @@ var FS=[
 '    vec3 toCam=normalize(ro-x);',
 '    float dop=dot(tang,toCam);',
 '    float beam=clamp(1.+dop*1.15,.32,2.5);', // doppler beaming
-'    vec3 dcol=mix(vec3(.72,.26,.09),vec3(1.,.6,.26),clamp(temp*.7,0.,1.));',
-'    dcol=mix(dcol,vec3(1.,.93,.8),clamp(temp-1.,0.,1.));',
+'    vec3 dcol=mix(vec3(.14,.10,.45),vec3(1.,.30,.55),clamp(temp*.7,0.,1.));', // indigo → rose (gasColor ala poggufanz: warm only where bright)
+'    dcol=mix(dcol,vec3(1.,.92,.80),clamp(temp-1.,0.,1.));', // → cream-white
 '    float edge=smoothstep(diskIn,diskIn+.55,cr)*(1.-smoothstep(diskOut-1.3,diskOut,cr));',
 '    col+=dcol*(temp*beam*streak)*1.2*edge;',
 '    hit=1.;break;',
@@ -918,14 +951,15 @@ var t0=performance.now(),lastT=0;
   if(c) c.addEventListener('click', function(){ dismissed=true; hide(); });
 })();
 
-/* ============ HYPERSPACE WARP ============ */
+/* ============ HYPERSPACE WARP — ala poggufanz (1.8s) ============
+   FOV punch + flash + shake + blur. Tombol "kembali ke atas". */
 (function(){
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var warpEl=document.getElementById('warp'), cv=document.getElementById('warpCanvas');
   var toTop=document.getElementById('toTop');
   if(!warpEl || !cv || !toTop) return;
   var ctx=cv.getContext('2d'), W, H, streaks=[], raf=null, startT=0;
-  var DUR=1200; // 1.2 detik
+  var DUR=1800; // 1.8 detik ala poggufanz
 
   function resize(){ W=cv.width=window.innerWidth; H=cv.height=window.innerHeight; }
   function initStreaks(){
@@ -947,9 +981,18 @@ var t0=performance.now(),lastT=0;
     if(el>=1){ end(); return; }
     // ease-in: makin cepat
     var speed=1+el*el*14;
+    // SHAKE: guncangan kamera, meluruh seiring waktu
+    var shk=(1-el)*10*Math.exp(-el*2.5);
+    var shx=(Math.random()-.5)*shk, shy=(Math.random()-.5)*shk;
+    // BLUR: memuncak di tengah animasi
+    var bl=Math.sin(el*Math.PI)*7;
+    warpEl.style.filter=bl>.3?('blur('+bl.toFixed(1)+'px)'):'';
+    // FOV PUNCH: scale canvas 1→1.22 di 25% pertama
+    var punch=el<.25 ? 1+.22*Math.sin(el/.25*Math.PI/2) : 1.22-.22*((el-.25)/.75);
+    cv.style.transform='scale('+punch.toFixed(3)+')';
     ctx.fillStyle='rgba(2,2,4,.28)';
     ctx.fillRect(0,0,W,H);
-    var cx=W/2, cy=H/2;
+    var cx=W/2+shx, cy=H/2+shy;
     for(var i=0;i<streaks.length;i++){
       var s=streaks[i];
       s.r-=s.sp*speed*3;
@@ -973,6 +1016,8 @@ var t0=performance.now(),lastT=0;
   }
   function end(){
     cancelAnimationFrame(raf); raf=null;
+    warpEl.style.filter='';
+    cv.style.transform='';
     window.scrollTo(0,0);
     warpEl.classList.remove('on');
   }
@@ -1020,4 +1065,181 @@ var t0=performance.now(),lastT=0;
     if(!ticking){ requestAnimationFrame(update); ticking=true; }
   },{passive:true});
   update();
+})();
+
+/* ============ AUDIO BEDS — ala poggufanz (2026-10-19) ============
+   5 beds dari ESA/NASA space recordings (public domain), diproses jadi ambient.
+   - Autoplay policy: mulai setelah interaksi pertama user (klik/scroll/keydown)
+   - Crossfade 2s antar section
+   - Gain per bed: blackhole 1.0, origin 0.95, orbits 0.85, tesseract 0.8
+   - Mute toggle di nav (#soundToggle) */
+(function(){
+'use strict';
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(reduceMotion) return; // hormat reduced motion: tanpa audio
+if(EMBED_MODE) return; // embed demo: tanpa audio
+
+var BEDS=[
+  {id:'blackhole', file:'assets/audio/bed-blackhole.mp3', gain:1.0,  sections:['hero']},
+  {id:'tesseract', file:'assets/audio/bed-tesseract.mp3', gain:0.8,  sections:['work','case-study']},
+  {id:'orbits',    file:'assets/audio/bed-orbits.mp3',    gain:0.85, sections:['process','services']},
+  {id:'origin',    file:'assets/audio/bed-origin.mp3',    gain:0.95, sections:['about','faq','final-cta']}
+];
+var XFADE=2.0; // detik
+var ctx=null, buffers={}, sources={}, gains={}, current=null, muted=false, started=false;
+var toggle=document.getElementById('soundToggle');
+
+function ensureCtx(){
+  if(ctx) return true;
+  try{
+    var AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC) return false;
+    ctx=new AC();
+    return true;
+  }catch(e){ return false; }
+}
+function loadBed(bed, done){
+  if(buffers[bed.id]){ done(); return; }
+  var req=new XMLHttpRequest();
+  req.open('GET', bed.file, true);
+  req.responseType='arraybuffer';
+  req.onload=function(){
+    if(req.status!==200){ done(); return; }
+    ctx.decodeAudioData(req.response, function(buf){
+      buffers[bed.id]=buf; done();
+    }, function(){ done(); });
+  };
+  req.onerror=function(){ done(); };
+  req.send();
+}
+function playBed(bed){
+  if(!buffers[bed.id] || sources[bed.id]) return;
+  var src=ctx.createBufferSource();
+  src.buffer=buffers[bed.id];
+  src.loop=true;
+  var g=ctx.createGain();
+  g.gain.value=0;
+  src.connect(g); g.connect(ctx.destination);
+  src.start();
+  sources[bed.id]=src; gains[bed.id]=g;
+}
+function setTarget(bed){
+  if(current===bed) return;
+  var t=ctx.currentTime;
+  // fade out yang lama
+  if(current && gains[current.id]){
+    gains[current.id].gain.cancelScheduledValues(t);
+    gains[current.id].gain.setValueAtTime(gains[current.id].gain.value, t);
+    gains[current.id].gain.linearRampToValueAtTime(0, t+XFADE);
+  }
+  // fade in yang baru
+  if(bed){
+    playBed(bed);
+    if(gains[bed.id]){
+      gains[bed.id].gain.cancelScheduledValues(t);
+      gains[bed.id].gain.setValueAtTime(gains[bed.id].gain.value, t);
+      gains[bed.id].gain.linearRampToValueAtTime(muted?0:bed.gain*0.5, t+XFADE);
+    }
+  }
+  current=bed;
+}
+function bedForSection(secId){
+  for(var i=0;i<BEDS.length;i++){
+    if(BEDS[i].sections.indexOf(secId)>=0) return BEDS[i];
+  }
+  return null;
+}
+function start(){
+  if(started) return; started=true;
+  if(!ensureCtx()) return;
+  if(ctx.state==='suspended') ctx.resume();
+  var pending=BEDS.length;
+  BEDS.forEach(function(bed){
+    loadBed(bed, function(){
+      if(--pending===0){
+        // semua loaded (atau gagal) → mulai observasi section
+        observeSections();
+        // langsung set bed untuk section yang terlihat
+        updateForScroll();
+      }
+    });
+  });
+}
+function secKey(el){
+  if(el.classList.contains('hero')) return 'hero';
+  if(el.classList.contains('final-cta')) return 'final-cta';
+  return el.id;
+}
+function observeSections(){
+  if(!('IntersectionObserver' in window)) return;
+  var io=new IntersectionObserver(function(es){
+    var best=null, bestRatio=0;
+    es.forEach(function(e){
+      if(e.isIntersecting && e.intersectionRatio>bestRatio){
+        bestRatio=e.intersectionRatio;
+        best=bedForSection(secKey(e.target));
+      }
+    });
+    if(best) setTarget(best);
+  },{threshold:[0.25,0.5,0.75]});
+  document.querySelectorAll('.hero, section[id], .final-cta').forEach(function(el){ io.observe(el); });
+}
+function updateForScroll(){
+  // fallback: tentukan bed dari posisi scroll jika IO belum trigger
+  var secs=document.querySelectorAll('.hero, section[id], .final-cta');
+  var vh=window.innerHeight, best=null, bestVis=0;
+  secs.forEach(function(el){
+    var r=el.getBoundingClientRect();
+    var vis=Math.max(0, Math.min(r.bottom, vh)-Math.max(r.top, 0));
+    if(vis>bestVis){
+      bestVis=vis;
+      best=bedForSection(secKey(el));
+    }
+  });
+  if(best) setTarget(best);
+}
+// mulai setelah interaksi pertama (autoplay policy)
+function onFirstInteract(){
+  start();
+  window.removeEventListener('click', onFirstInteract);
+  window.removeEventListener('scroll', onFirstInteract);
+  window.removeEventListener('keydown', onFirstInteract);
+}
+window.addEventListener('click', onFirstInteract, {passive:true});
+window.addEventListener('scroll', onFirstInteract, {passive:true});
+window.addEventListener('keydown', onFirstInteract);
+// mute toggle
+if(toggle){
+  toggle.addEventListener('click', function(e){
+    e.stopPropagation();
+    muted=!muted;
+    toggle.classList.toggle('muted', muted);
+    toggle.setAttribute('aria-pressed', muted?'true':'false');
+    if(ctx && current && gains[current.id]){
+      var t=ctx.currentTime;
+      gains[current.id].gain.cancelScheduledValues(t);
+      gains[current.id].gain.setValueAtTime(gains[current.id].gain.value, t);
+      gains[current.id].gain.linearRampToValueAtTime(muted?0:current.gain*0.5, t+0.5);
+    }
+  });
+}
+// UI travel sound saat klik tombol CTA (opsional, halus)
+document.addEventListener('click', function(e){
+  if(!ctx || muted || !started) return;
+  var t=e.target.closest && e.target.closest('.btn-accent');
+  if(!t) return;
+  try{
+    var req=new XMLHttpRequest();
+    req.open('GET','assets/audio/ui-travel.mp3',true);
+    req.responseType='arraybuffer';
+    req.onload=function(){
+      ctx.decodeAudioData(req.response, function(buf){
+        var s=ctx.createBufferSource(); s.buffer=buf;
+        var g=ctx.createGain(); g.gain.value=0.25;
+        s.connect(g); g.connect(ctx.destination); s.start();
+      }, function(){});
+    };
+    req.send();
+  }catch(err){}
+}, {passive:true});
 })();
